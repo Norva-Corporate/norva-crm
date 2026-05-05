@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# norva-crm
 
-## Getting Started
+Internal CRM for **Agence Prime** — manage contacts, companies, deal pipeline, projects, and billing in one place.
 
-First, run the development server:
+Built for a small team (2–5 people) with Next.js 14, Supabase, and a custom design system.
+
+## Stack
+
+- **Framework**: Next.js 14 (App Router) + TypeScript
+- **Backend**: Supabase (Postgres, Auth, RLS)
+- **Styling**: Tailwind CSS + custom CSS variables (dark minimalist, sharp edges)
+- **UI components**: hand-rolled shadcn-style components in `src/components/ui/` (no shadcn CLI)
+- **Forms**: react-hook-form + zod
+- **Drag & drop**: @dnd-kit (pipeline kanban)
+
+## Modules
+
+- **Auth** — login / signup via Supabase, middleware route protection
+- **Contacts** — CRUD, table view, dialog forms
+- **Companies** — CRUD, card grid view
+- **Pipeline** — kanban with 6 stages (prospect → qualified → proposal → negotiation → won / lost)
+- **Projects** — card grid with status filters, linked to deals
+- **Billing** — quotes + invoices, line items, TVA, auto-numbering via Supabase RPC
+- **Settings** — profile + team member role management (admin-only deletes)
+
+## Getting started
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Supabase
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Copy `.env.example` to `.env.local` and fill in:
+
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=...
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+   ```
+
+3. Run the migration in the Supabase SQL editor:
+
+   ```
+   supabase/migrations/001_initial_schema.sql
+   ```
+
+   This creates all tables, RLS policies, the auto-profile trigger on `auth.users`, and the `generate_invoice_number` RPC.
+
+### 3. Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App is at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run start` | Run the production build |
+| `npm run lint` | ESLint |
 
-## Learn More
+## Multi-user model
 
-To learn more about Next.js, take a look at the following resources:
+- Profiles auto-created via trigger on `auth.users` insert.
+- Roles: `admin` | `member`.
+- RLS — every member can read/write all records; only admins can delete.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+  app/
+    (dashboard)/      # protected dashboard route group
+    auth/             # login + Supabase OAuth callback
+  components/
+    ui/               # button, input, dialog, select, ...
+    layout/           # sidebar, header, settings
+    contacts/         # contacts + companies clients
+    pipeline/         # kanban
+    projects/
+    billing/
+  lib/
+    supabase/         # browser, server, middleware clients
+    utils.ts          # cn(), formatCurrency(), formatDate(), getInitials()
+  types/
+    index.ts          # shared TypeScript interfaces
+  middleware.ts       # session refresh + route protection
+supabase/
+  migrations/         # SQL schema
+```
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private — internal use at Agence Prime.

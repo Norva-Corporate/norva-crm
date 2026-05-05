@@ -2,26 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0B1220;
+  --foreground: #E8EDF5;
+  --surface: #111827;
+  --card: #131E30;
+  --card-foreground: #E8EDF5;
+  --border: rgba(138, 153, 184, 0.15);
+  --muted: #1A2540;
+  --sidebar: #0D1626;
+  --sidebar-border: rgba(138, 153, 184, 0.1);
+  --sidebar-foreground: #E8EDF5;
+  --sidebar-muted: #8A99B8;
+  --radius: 4px;
+  --font-inter: 'Inter', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(138, 153, 184, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 153, 184, 0.4);
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 123, 245, 0.3);
+  color: #E8EDF5;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .glass {
+    background: rgba(19, 30, 48, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(138, 153, 184, 0.1);
   }
 }
