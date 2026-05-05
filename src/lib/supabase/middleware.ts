@@ -1,6 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PUBLIC_PATHS = new Set(["/", "/login", "/inscription"]);
+
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  if (pathname.startsWith("/auth/")) return true;
+  return false;
+}
+
+function isAuthPage(pathname: string): boolean {
+  return pathname === "/login" || pathname === "/inscription";
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -29,16 +41,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
-  const isPublicRoute = request.nextUrl.pathname === "/";
+  const { pathname } = request.nextUrl;
 
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  if (user && isAuthPage(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

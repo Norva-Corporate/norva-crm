@@ -74,6 +74,18 @@ const stageLabel: Record<string, string> = {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user!.id)
+    .single();
+
+  const firstName =
+    profile?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "";
+
   const { contactsCount, companiesCount, pipeline, revenue, recentDeals } =
     await getDashboardStats(supabase);
 
@@ -117,6 +129,15 @@ export default async function DashboardPage() {
       <Header title="Tableau de bord" />
 
       <div className="flex-1 p-6 space-y-6 animate-fade-in">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">
+            Bonjour {firstName}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Voici un aperçu de votre activité.
+          </p>
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => {
