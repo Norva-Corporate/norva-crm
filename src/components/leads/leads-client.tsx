@@ -47,10 +47,9 @@ const TABS: { key: "pending" | "all" | "converted" | "dismissed"; label: string 
 interface Props {
   leads: LeadWithDedup[];
   companies: { id: string; name: string }[];
-  webhookConfig?: React.ReactNode;
 }
 
-export function LeadsClient({ leads, companies, webhookConfig }: Props) {
+export function LeadsClient({ leads, companies }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"pending" | "all" | "converted" | "dismissed">(
     "pending"
@@ -159,13 +158,7 @@ export function LeadsClient({ leads, companies, webhookConfig }: Props) {
           {filtered.length === 0 ? (
             <div className="px-4 py-12 text-center text-sm text-muted-foreground">
               {leads.length === 0 ? (
-                <>
-                  Aucun lead pour le moment. Configure le webhook multica.ai sur
-                  <code className="mx-1 px-1.5 py-0.5 bg-[var(--muted)] text-foreground rounded-sm font-mono text-xs">
-                    /api/webhooks/multica
-                  </code>
-                  pour commencer.
-                </>
+                <>Aucun lead pour le moment. Tes agents multica vont remplir cette liste.</>
               ) : (
                 <>Aucun lead ne correspond aux filtres.</>
               )}
@@ -306,8 +299,6 @@ export function LeadsClient({ leads, companies, webhookConfig }: Props) {
             </ul>
           )}
         </Card>
-
-        {webhookConfig}
       </div>
 
       <ConvertLeadDrawer
