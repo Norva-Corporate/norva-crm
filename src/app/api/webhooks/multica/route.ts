@@ -23,6 +23,19 @@ function readSecret(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[webhook/multica] uncaught error:", err);
+    return NextResponse.json(
+      { error: "internal error", detail: message },
+      { status: 500 }
+    );
+  }
+}
+
+async function handle(req: NextRequest) {
   const expected = process.env.MULTICA_WEBHOOK_SECRET ?? "";
   const provided = readSecret(req);
   if (!expected || !timingSafeEqual(provided, expected)) {
