@@ -7,13 +7,14 @@ multica que Kylian utilise pour alimenter Norva CRM.
 
     docs/agents/
     ├── README.md                      ← ce fichier
-    ├── prospection-prompt.md          ← prompt principal (slim) Agent Prospection
+    ├── prospection-prompt.md          ← prompt principal (slim)
     └── skills/
         ├── prospection-google-places/SKILL.md
+        ├── prospection-enrichment-gouv/SKILL.md   ← NEW (gérant + SIREN gratuit)
         ├── prospection-site-audit/SKILL.md
-        ├── prospection-email-discovery/SKILL.md
+        ├── prospection-email-discovery/SKILL.md   ← deep search (mentions légales)
         ├── prospection-scoring/SKILL.md
-        └── norva-supabase-insert/SKILL.md   ← réutilisable par tous les agents
+        └── norva-supabase-insert/SKILL.md         ← réutilisable par tous les agents
 
 ## Comment utiliser
 
@@ -40,12 +41,7 @@ YAML (`name`, `description`) suivi du corps de la procédure.
    ce que multica accepte)
 4. Sauvegarde
 5. Sur l'agent Prospection → onglet **Skills** → "+ Attach" → choisis
-   les 5 skills :
-   - `prospection-google-places`
-   - `prospection-site-audit`
-   - `prospection-email-discovery`
-   - `prospection-scoring`
-   - `norva-supabase-insert`
+   les 6 skills
 
 > Si multica ne supporte pas le front-matter, supprime simplement
 > les 4 lignes entre les `---` au début du fichier.
@@ -58,7 +54,8 @@ Voir `docs/multica-integration.md` pour la config complète. Récap :
 
 | Variable | Source | Pour quels agents |
 |---|---|---|
-| `GOOGLE_MAPS_API_KEY` | console.cloud.google.com | Prospection |
+| `GOOGLE_MAPS_API_KEY` | console.cloud.google.com (Places API) | Prospection |
+| `HUNTER_API_KEY` *(optionnel)* | hunter.io (free tier 25/mois) | Prospection (fallback email) |
 
 ### Custom Args (onglet Custom Args de l'agent)
 
@@ -71,13 +68,44 @@ Deux lignes (ou une seule séparée par espace) :
 
 Voir `docs/multica-integration.md` étape 2.
 
+## Sources de données utilisées (par ordre de priorité)
+
+### Gratuites, sans clé API, illimitées
+
+1. **API Recherche Entreprises (data.gouv.fr)** —
+   `recherche-entreprises.api.gouv.fr` — SIREN, dirigeants, NAF,
+   effectif. **Source officielle gouv FR**, 7 req/sec, totalement
+   gratuit.
+2. **Mentions légales du site prospect** — obligatoires en France
+   (loi LCEN). Email + SIRET + dirigeant garantis si le pro a un site.
+3. **Pages Jaunes** — annuaire pro français. Scraping via WebFetch.
+
+### Gratuites avec clé / quota
+
+4. **Google Places API (New)** — 200 $/mois de crédit gratuit Google
+   Cloud, soit ~6000 recherches Text Search/mois.
+5. **Hunter.io** — 25 recherches d'email/mois gratuit (fallback).
+
+### Réseaux sociaux (scraping public)
+
+6. **Facebook Business** (section À propos)
+7. **Instagram** (bio + lien externe)
+
+### Payantes (à éviter au max pour le ROI)
+
+- **Pappers.fr API** — gratuit jusqu'à 100 req/jour, payant après.
+  Pas indispensable car l'API gouv couvre l'essentiel.
+- **Dropcontact** — payant, pour enrichir les emails à grande échelle.
+- **Apollo.io** — payant, base B2B internationale.
+
 ## Index des agents
 
 | Fichier | Agent multica | Sortie cible | Skills attachées |
 |---------|---------------|--------------|------------------|
-| `prospection-prompt.md` | Agent Prospection | `lead_imports` | les 5 skills ci-dessus |
+| `prospection-prompt.md` | Agent Prospection | `lead_imports` | les 6 skills ci-dessus |
 
 Pour ajouter un nouvel agent (ex. enrichissement, suivi) : créer un
 nouveau prompt principal dans `docs/agents/<nom>-prompt.md` qui
-référence les skills réutilisables (typiquement `norva-supabase-insert`)
-plus des skills spécifiques au métier.
+référence les skills réutilisables (`norva-supabase-insert`,
+éventuellement `prospection-enrichment-gouv` aussi) plus des skills
+spécifiques au métier.
