@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import React, { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ function SubmitButton() {
 }
 
 export function LoginForm() {
-  const [state, formAction] = useFormState<AuthState, FormData>(
+  const [state, formAction] = useActionState<AuthState, FormData>(
     loginAction,
     undefined
   );
