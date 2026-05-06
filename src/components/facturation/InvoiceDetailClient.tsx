@@ -2,7 +2,16 @@
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Send, CheckCircle2, Printer, Ban, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Pencil,
+  Send,
+  CheckCircle2,
+  Download,
+  Ban,
+  Loader2,
+  FileText,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,8 +21,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
-import { updateInvoiceStatus } from "@/lib/actions/invoices";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import {
+  updateInvoiceStatus,
+  convertQuoteToInvoice,
+} from "@/lib/actions/invoices";
+import {
+  formatCurrency,
+  formatDate,
+  cn,
+  getEffectiveInvoiceStatus,
+} from "@/lib/utils";
 import type {
   Invoice,
   InvoiceItem,
@@ -80,10 +97,12 @@ export function InvoiceDetailClient({
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const sc = STATUS_CONFIG[invoice.status];
+  const effectiveStatus = getEffectiveInvoiceStatus(invoice);
+  const sc = STATUS_CONFIG[effectiveStatus];
   const isQuote = invoice.type === "quote";
   const docLabel: Record<DocumentType, string> = {
     invoice: "Facture",
@@ -115,8 +134,22 @@ export function InvoiceDetailClient({
     });
   }
 
-  function handlePrint() {
-    window.print();
+  function handleDownloadPdf() {
+    const url = `/api/invoices/${invoice.id}/pdf`;
+    window.open(url, "_blank");
+  }
+
+  function handleConvert() {
+    setError(null);
+    startTransition(async () => {
+      const res = await convertQuoteToInvoice(invoice.id);
+      if (!res.success) {
+        setError(res.error);
+        return;
+      }
+      setConvertOpen(false);
+      router.push(`/dashboard/facturation/${res.data.id}`);
+    });
   }
 
   return (
@@ -327,21 +360,34 @@ export function InvoiceDetailClient({
           </Button>
         )}
 
-        {(invoice.status === "envoyee" || invoice.status === "en_retard") && (
+        {!isQuote &&
+          (effectiveStatus === "envoyee" ||
+            effectiveStatus === "en_retard") && (
+            <Button
+              size="sm"
+              onClick={() => changeStatus("payee")}
+              disabled={pending}
+            >
+              {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Marquer payée
+            </Button>
+          )}
+
+        {isQuote && invoice.status !== "annulee" && (
           <Button
             size="sm"
-            onClick={() => changeStatus("payee")}
+            onClick={() => setConvertOpen(true)}
             disabled={pending}
           >
-            {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Marquer payée
+            <FileText className="h-3.5 w-3.5" />
+            Convertir en facture
           </Button>
         )}
 
-        <Button size="sm" variant="outline" onClick={handlePrint}>
-          <Printer className="h-3.5 w-3.5" />
-          Exporter PDF
+        <Button size="sm" variant="outline" onClick={handleDownloadPdf}>
+          <Download className="h-3.5 w-3.5" />
+          Télécharger PDF
         </Button>
 
         <Button
@@ -363,7 +409,7 @@ export function InvoiceDetailClient({
             className="ml-auto text-destructive hover:text-destructive"
           >
             <Ban className="h-3.5 w-3.5" />
-            Annuler la facture
+            {isQuote ? "Annuler le devis" : "Annuler la facture"}
           </Button>
         )}
       </div>
@@ -377,6 +423,41 @@ export function InvoiceDetailClient({
         companies={companies}
         onSuccess={() => router.refresh()}
       />
+
+      <Dialog
+        open={convertOpen}
+        onOpenChange={(o) => !pending && setConvertOpen(o)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Convertir en facture</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 pb-2 space-y-2">
+            <p className="text-sm text-foreground">
+              Le devis{" "}
+              <span className="font-mono font-medium">{invoice.number}</span>{" "}
+              sera cloné en facture (statut Brouillon, échéance dans 30 jours).
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Le devis original reste inchangé. Tu pourras éditer la facture
+              avant de l'envoyer.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConvertOpen(false)}
+              disabled={pending}
+            >
+              Retour
+            </Button>
+            <Button onClick={handleConvert} disabled={pending}>
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Convertir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cancelOpen} onOpenChange={(o) => !pending && setCancelOpen(o)}>
         <DialogContent className="max-w-sm">

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { GlobalSearch } from "@/components/global-search";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
@@ -45,6 +46,7 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
       >
         {children}
       </main>
+      <GlobalSearch />
     </div>
   );
 }

@@ -268,6 +268,108 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
 }
 
 // ============================================================
+// CONVERT — devis -> facture (1.1)
+// ============================================================
+// Crée une nouvelle facture en clonant les line items du devis.
+// Numéro régénéré via RPC, statut "brouillon",
+// date d'émission = aujourd'hui, échéance = +30 jours.
+export async function convertQuoteToInvoice(
+  quoteId: string
+): Promise<ActionResult<{ id: string }>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const { data: quote, error: qErr } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", quoteId)
+    .single();
+  if (qErr || !quote) {
+    return { success: false, error: "Devis introuvable." };
+  }
+  if (quote.type !== "quote") {
+    return {
+      success: false,
+      error: "Seuls les devis peuvent être convertis en facture.",
+    };
+  }
+
+  const { data: number, error: rpcErr } = await supabase.rpc(
+    "generate_invoice_number",
+    { doc_type: "invoice" }
+  );
+  if (rpcErr || !number) {
+    return {
+      success: false,
+      error: rpcErr?.message ?? "Impossible de générer le numéro de facture.",
+    };
+  }
+
+  const today = new Date();
+  const issue_date = today.toISOString().split("T")[0];
+  const due = new Date(today);
+  due.setDate(due.getDate() + 30);
+  const due_date = due.toISOString().split("T")[0];
+
+  const { data: inserted, error: insErr } = await supabase
+    .from("invoices")
+    .insert({
+      number,
+      type: "invoice",
+      status: "brouillon",
+      project_id: quote.project_id,
+      contact_id: quote.contact_id,
+      company_id: quote.company_id,
+      issue_date,
+      due_date,
+      subtotal: quote.subtotal,
+      tax_rate: quote.tax_rate,
+      tax_amount: quote.tax_amount,
+      total: quote.total,
+      notes: quote.notes,
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (insErr || !inserted) {
+    return {
+      success: false,
+      error: insErr?.message ?? "Création de la facture impossible.",
+    };
+  }
+
+  const { data: items } = await supabase
+    .from("invoice_items")
+    .select("description, quantity, unit_price, total, sort_order")
+    .eq("invoice_id", quoteId)
+    .order("sort_order", { ascending: true });
+
+  if (items && items.length > 0) {
+    const payload = items.map((it, idx) => ({
+      invoice_id: inserted.id,
+      description: it.description,
+      quantity: it.quantity,
+      unit_price: it.unit_price,
+      total: it.total,
+      sort_order: idx,
+    }));
+    const { error: itemsErr } = await supabase
+      .from("invoice_items")
+      .insert(payload);
+    if (itemsErr) {
+      return { success: false, error: itemsErr.message };
+    }
+  }
+
+  revalidateInvoices(inserted.id);
+  return { success: true, data: { id: inserted.id } };
+}
+
+// ============================================================
 // READ — dernier numéro pour preview
 // ============================================================
 export async function getLastInvoiceNumber(

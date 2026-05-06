@@ -22,7 +22,12 @@ import {
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteInvoice } from "@/lib/actions/invoices";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatDate,
+  cn,
+  getEffectiveInvoiceStatus,
+} from "@/lib/utils";
 import type { Invoice, InvoiceStatus, DocumentType } from "@/types";
 
 const STATUS_CONFIG: Record<
@@ -79,26 +84,35 @@ export function FacturationClient({
   const [deleting, setDeleting] = useState<InvoiceRow | null>(null);
   const [, startTransition] = useTransition();
 
+  const withEffective = useMemo(
+    () =>
+      initialInvoices.map((inv) => ({
+        ...inv,
+        effective_status: getEffectiveInvoiceStatus(inv),
+      })),
+    [initialInvoices]
+  );
+
   const stats = useMemo(() => {
-    const actives = initialInvoices.filter(
-      (i) => i.type === "invoice" && i.status !== "annulee"
+    const actives = withEffective.filter(
+      (i) => i.type === "invoice" && i.effective_status !== "annulee"
     );
     const totalFacture = actives.reduce((s, i) => s + (i.total ?? 0), 0);
     const encaisse = actives
-      .filter((i) => i.status === "payee")
+      .filter((i) => i.effective_status === "payee")
       .reduce((s, i) => s + (i.total ?? 0), 0);
     const enAttente = actives
-      .filter((i) => i.status === "envoyee")
+      .filter((i) => i.effective_status === "envoyee")
       .reduce((s, i) => s + (i.total ?? 0), 0);
     const enRetard = actives
-      .filter((i) => i.status === "en_retard")
+      .filter((i) => i.effective_status === "en_retard")
       .reduce((s, i) => s + (i.total ?? 0), 0);
     return { totalFacture, encaisse, enAttente, enRetard };
-  }, [initialInvoices]);
+  }, [withEffective]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return initialInvoices.filter((inv) => {
+    return withEffective.filter((inv) => {
       const matchesSearch =
         !q ||
         inv.number.toLowerCase().includes(q) ||
@@ -108,10 +122,10 @@ export function FacturationClient({
         inv.company?.name?.toLowerCase().includes(q);
       const matchesType = typeFilter === "all" || inv.type === typeFilter;
       const matchesStatus =
-        statusFilter === "all" || inv.status === statusFilter;
+        statusFilter === "all" || inv.effective_status === statusFilter;
       return matchesSearch && matchesType && matchesStatus;
     });
-  }, [initialInvoices, search, typeFilter, statusFilter]);
+  }, [withEffective, search, typeFilter, statusFilter]);
 
   function openCreate() {
     setEditing(null);
@@ -243,7 +257,7 @@ export function FacturationClient({
                   </tr>
                 ) : (
                   filtered.map((inv) => {
-                    const sc = STATUS_CONFIG[inv.status];
+                    const sc = STATUS_CONFIG[inv.effective_status];
                     return (
                       <tr
                         key={inv.id}
@@ -252,7 +266,7 @@ export function FacturationClient({
                         }
                         className={cn(
                           "border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--muted)]/20 transition-colors cursor-pointer",
-                          inv.status === "annulee" && "opacity-50"
+                          inv.effective_status === "annulee" && "opacity-50"
                         )}
                       >
                         <td className="px-4 py-3">

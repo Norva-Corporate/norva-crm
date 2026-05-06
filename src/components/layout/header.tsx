@@ -1,8 +1,8 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Search, Bell, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { GLOBAL_SEARCH_OPEN_EVENT } from "@/components/global-search";
 
 interface HeaderProps {
   title: string;
@@ -13,18 +13,37 @@ interface HeaderProps {
 }
 
 export function Header({ title, action }: HeaderProps) {
+  const [shortcut, setShortcut] = useState("⌘K");
+
+  useEffect(() => {
+    if (
+      typeof navigator !== "undefined" &&
+      !/Mac|iPhone|iPad/.test(navigator.platform)
+    ) {
+      setShortcut("Ctrl+K");
+    }
+  }, []);
+
+  function openSearch() {
+    window.dispatchEvent(new Event(GLOBAL_SEARCH_OPEN_EVENT));
+  }
+
   return (
     <header className="h-14 border-b border-[var(--border)] bg-[var(--background)] flex items-center px-6 gap-4 sticky top-0 z-30">
       <h1 className="text-sm font-semibold text-foreground flex-shrink-0">{title}</h1>
 
       <div className="flex-1 max-w-sm ml-4">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher..."
-            className="pl-8 h-8 text-xs bg-[var(--surface)]"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={openSearch}
+          className="w-full flex items-center gap-2 h-8 px-2.5 text-xs text-muted-foreground bg-[var(--surface)] border border-[var(--border)] hover:text-foreground hover:border-[var(--muted)] transition-colors"
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span className="flex-1 text-left">Rechercher…</span>
+          <kbd className="hidden sm:inline-flex h-5 items-center px-1.5 text-[10px] font-mono bg-[var(--muted)] border border-[var(--border)] rounded-sm">
+            {shortcut}
+          </kbd>
+        </button>
       </div>
 
       <div className="flex items-center gap-2 ml-auto">

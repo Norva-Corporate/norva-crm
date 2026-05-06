@@ -1,8 +1,25 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { InvoiceStatus } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// Promotes `envoyee` invoices past their due date to `en_retard`
+// without mutating the underlying row. Mirrors the SQL view
+// `invoices_with_effective_status` (migration 004).
+export function getEffectiveInvoiceStatus(invoice: {
+  status: InvoiceStatus | string;
+  due_date: string | null | undefined;
+}): InvoiceStatus {
+  if (invoice.status === "envoyee" && invoice.due_date) {
+    const due = new Date(`${invoice.due_date}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (due < today) return "en_retard";
+  }
+  return invoice.status as InvoiceStatus;
 }
 
 export function formatCurrency(amount: number, currency = "EUR"): string {
