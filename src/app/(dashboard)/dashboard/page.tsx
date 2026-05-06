@@ -35,7 +35,7 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof createClien
     supabase
       .from("invoices")
       .select("total, status")
-      .in("status", ["sent", "paid"]),
+      .in("status", ["envoyee", "payee"]),
   ]);
 
   const pipeline = (deals ?? []).reduce(
@@ -48,7 +48,7 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof createClien
   );
 
   const revenue = (invoices ?? [])
-    .filter((i) => i.status === "paid")
+    .filter((i) => i.status === "payee")
     .reduce((acc, i) => acc + (i.total ?? 0), 0);
 
   return { contactsCount, companiesCount, pipeline, revenue, recentDeals };
@@ -74,6 +74,18 @@ const stageLabel: Record<string, string> = {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user!.id)
+    .single();
+
+  const firstName =
+    profile?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "";
+
   const { contactsCount, companiesCount, pipeline, revenue, recentDeals } =
     await getDashboardStats(supabase);
 
@@ -106,7 +118,7 @@ export default async function DashboardPage() {
       title: "CA encaissé",
       value: formatCurrency(revenue),
       icon: FileText,
-      href: "/dashboard/billing",
+      href: "/dashboard/facturation",
       color: "text-[#4ADE80]",
       bg: "bg-[#22C55E]/10",
     },
@@ -117,6 +129,15 @@ export default async function DashboardPage() {
       <Header title="Tableau de bord" />
 
       <div className="flex-1 p-6 space-y-6 animate-fade-in">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">
+            Bonjour {firstName}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Voici un aperçu de votre activité.
+          </p>
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => {

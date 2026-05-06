@@ -1,24 +1,40 @@
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
-import { PipelineClient } from "@/components/pipeline/pipeline-client";
+import { PipelineClient } from "@/components/pipeline/PipelineClient";
+import type { DealWithRelations } from "@/types";
 
 export default async function PipelinePage() {
   const supabase = await createClient();
 
-  const [{ data: deals }, { data: contacts }, { data: companies }, { data: profiles }] =
-    await Promise.all([
-      supabase
-        .from("deals")
-        .select("*, contact:contacts(id, first_name, last_name), company:companies(id, name), assignee:profiles(id, full_name)")
-        .order("stage_order", { ascending: true }),
-      supabase.from("contacts").select("id, first_name, last_name").order("first_name"),
-      supabase.from("companies").select("id, name").order("name"),
-      supabase.from("profiles").select("id, full_name").order("full_name"),
-    ]);
+  const [
+    { data: deals },
+    { data: contacts },
+    { data: companies },
+    { data: profiles },
+  ] = await Promise.all([
+    supabase
+      .from("deals")
+      .select(
+        "*, contact:contacts(id, first_name, last_name), company:companies(id, name), assignee:profiles!deals_assigned_to_fkey(id, full_name, email, avatar_url, role, created_at, updated_at)"
+      )
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("contacts")
+      .select("id, first_name, last_name, company_id")
+      .order("first_name", { ascending: true }),
+    supabase
+      .from("companies")
+      .select("id, name")
+      .order("name", { ascending: true }),
+    supabase
+      .from("profiles")
+      .select("id, full_name")
+      .order("full_name", { ascending: true }),
+  ]);
 
   return (
     <PipelineClient
-      initialDeals={deals ?? []}
+      initialDeals={(deals ?? []) as unknown as DealWithRelations[]}
       contacts={contacts ?? []}
       companies={companies ?? []}
       profiles={profiles ?? []}

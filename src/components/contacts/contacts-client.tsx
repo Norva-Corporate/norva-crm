@@ -1,153 +1,95 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Search,
+  MoreHorizontal,
+  Mail,
+  Phone,
+  Building2,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  UserPlus,
+} from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, MoreHorizontal, Mail, Phone, Building2, Loader2, Pencil, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { getInitials, formatDate } from "@/lib/utils";
-import { useRouter } from "next/navigation";
-import type { Contact, ContactWithRelations } from "@/types";
+import { ContactDrawer } from "@/components/contacts/ContactDrawer";
+import { DeleteModal } from "@/components/contacts/DeleteModal";
+import { deleteContact } from "@/lib/actions/contacts";
+import { getInitials, formatDate, cn } from "@/lib/utils";
+import type { Contact, Company } from "@/types";
 
-interface ContactFormData {
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  job_title: string;
-  company_id: string;
-  notes: string;
-}
-
-const defaultForm: ContactFormData = {
-  first_name: "",
-  last_name: "",
-  email: "",
-  phone: "",
-  job_title: "",
-  company_id: "",
-  notes: "",
+type ContactRow = Contact & {
+  company: { id: string; name: string } | null;
 };
 
 interface Props {
-  initialContacts: any[];
-  companies: { id: string; name: string }[];
+  initialContacts: ContactRow[];
+  companies: Pick<Company, "id" | "name">[];
 }
+
+const PAGE_SIZE = 20;
 
 export function ContactsClient({ initialContacts, companies }: Props) {
   const router = useRouter();
-  const [contacts, setContacts] = useState<any[]>(initialContacts);
   const [search, setSearch] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState<ContactFormData>(defaultForm);
-  const [loading, setLoading] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editing, setEditing] = useState<Contact | null>(null);
+  const [deleting, setDeleting] = useState<ContactRow | null>(null);
+  const [, startTransition] = useTransition();
 
-  const filtered = useMemo(
-    () =>
-      contacts.filter((c) => {
-        const q = search.toLowerCase();
-        return (
-          !q ||
-          `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
-          c.email?.toLowerCase().includes(q) ||
-          c.company?.name?.toLowerCase().includes(q)
-        );
-      }),
-    [contacts, search]
-  );
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return initialContacts;
+    return initialContacts.filter((c) => {
+      return (
+        `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q) ||
+        c.role?.toLowerCase().includes(q) ||
+        c.company?.name?.toLowerCase().includes(q)
+      );
+    });
+  }, [initialContacts, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, safePage]);
 
   function openCreate() {
     setEditing(null);
-    setForm(defaultForm);
-    setIsOpen(true);
+    setDrawerOpen(true);
   }
 
-  function openEdit(contact: any) {
+  function openEdit(contact: ContactRow) {
     setEditing(contact);
-    setForm({
-      first_name: contact.first_name,
-      last_name: contact.last_name,
-      email: contact.email ?? "",
-      phone: contact.phone ?? "",
-      job_title: contact.job_title ?? "",
-      company_id: contact.company_id ?? "",
-      notes: contact.notes ?? "",
+    setDrawerOpen(true);
+  }
+
+  function handleDeleted() {
+    if (!deleting) return Promise.resolve({ success: true } as const);
+    return deleteContact(deleting.id).then((res) => {
+      if (res.success) {
+        startTransition(() => router.refresh());
+      }
+      return res;
     });
-    setIsOpen(true);
-  }
-
-  async function handleSave() {
-    setLoading(true);
-    const supabase = createClient();
-    const payload = {
-      ...form,
-      company_id: form.company_id || null,
-      email: form.email || null,
-      phone: form.phone || null,
-      job_title: form.job_title || null,
-      notes: form.notes || null,
-    };
-
-    if (editing) {
-      const { data, error } = await supabase
-        .from("contacts")
-        .update(payload)
-        .eq("id", editing.id)
-        .select("*, company:companies(id, name)")
-        .single();
-      if (!error && data) {
-        setContacts((prev) => prev.map((c) => (c.id === editing.id ? data : c)));
-      }
-    } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from("contacts")
-        .insert({ ...payload, created_by: user!.id })
-        .select("*, company:companies(id, name)")
-        .single();
-      if (!error && data) {
-        setContacts((prev) => [data, ...prev]);
-      }
-    }
-
-    setLoading(false);
-    setIsOpen(false);
-  }
-
-  async function handleDelete(id: string) {
-    const supabase = createClient();
-    const { error } = await supabase.from("contacts").delete().eq("id", id);
-    if (!error) {
-      setContacts((prev) => prev.filter((c) => c.id !== id));
-    }
-    setDeleteId(null);
   }
 
   return (
@@ -158,72 +100,107 @@ export function ContactsClient({ initialContacts, companies }: Props) {
       />
 
       <div className="flex-1 p-6 animate-fade-in">
-        {/* Search */}
+        {/* Toolbar */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Rechercher un contact..."
+              placeholder="Rechercher un contact…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="pl-8 h-8 text-xs"
             />
           </div>
-          <span className="text-xs text-muted-foreground">{filtered.length} contact(s)</span>
+          <span className="text-xs text-muted-foreground">
+            {filtered.length} contact{filtered.length > 1 ? "s" : ""}
+          </span>
         </div>
 
-        {/* Table */}
+        {/* Tableau */}
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Contact</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Email</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Téléphone</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Entreprise</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Ajouté le</th>
+                  <Th>Contact</Th>
+                  <Th>Entreprise</Th>
+                  <Th>Email</Th>
+                  <Th>Téléphone</Th>
+                  <Th>Rôle</Th>
                   <th className="w-10" />
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={6}
+                      className="px-4 py-16 text-center text-sm text-muted-foreground"
+                    >
+                      <UserPlus className="h-6 w-6 mx-auto mb-2 text-muted-foreground/60" />
                       Aucun contact trouvé.{" "}
-                      <button onClick={openCreate} className="text-accent hover:underline">
+                      <button
+                        onClick={openCreate}
+                        className="text-accent hover:underline"
+                      >
                         Créer le premier
                       </button>
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((contact) => (
+                  paginated.map((contact, idx) => (
                     <tr
                       key={contact.id}
-                      className="border-b border-[var(--border)] hover:bg-[var(--muted)]/20 transition-colors"
+                      className={cn(
+                        "border-b border-[var(--border)] transition-colors hover:bg-[var(--muted)]/30",
+                        idx % 2 === 0
+                          ? "bg-[#0B1220]"
+                          : "bg-[#111927]"
+                      )}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        <Link
+                          href={`/dashboard/contacts/${contact.id}`}
+                          className="flex items-center gap-3 group"
+                        >
                           <Avatar className="h-7 w-7">
-                            <AvatarFallback className="text-[10px]">
-                              {getInitials(`${contact.first_name} ${contact.last_name}`)}
+                            <AvatarFallback className="text-[10px] bg-accent/15 text-accent">
+                              {getInitials(
+                                `${contact.first_name} ${contact.last_name}`
+                              )}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="text-sm font-medium text-foreground">
+                            <p className="text-sm font-medium text-foreground group-hover:text-accent transition-colors">
                               {contact.first_name} {contact.last_name}
                             </p>
-                            {contact.job_title && (
-                              <p className="text-xs text-muted-foreground">{contact.job_title}</p>
-                            )}
+                            <p className="text-[10px] text-muted-foreground">
+                              {formatDate(contact.created_at)}
+                            </p>
                           </div>
-                        </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        {contact.company ? (
+                          <Link
+                            href={`/dashboard/companies/${contact.company.id}`}
+                            className="inline-flex items-center gap-1.5 text-xs text-foreground hover:text-accent transition-colors"
+                          >
+                            <Building2 className="h-3 w-3 text-muted-foreground" />
+                            {contact.company.name}
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {contact.email ? (
                           <a
                             href={`mailto:${contact.email}`}
-                            className="text-xs text-accent hover:underline flex items-center gap-1"
+                            className="text-xs text-accent hover:underline inline-flex items-center gap-1"
                           >
                             <Mail className="h-3 w-3" />
                             {contact.email}
@@ -233,23 +210,20 @@ export function ContactsClient({ initialContacts, companies }: Props) {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-foreground">
-                          {contact.phone ?? <span className="text-muted-foreground">—</span>}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {contact.company ? (
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs text-foreground">{contact.company.name}</span>
-                          </div>
+                        {contact.phone ? (
+                          <span className="text-xs text-foreground inline-flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            {contact.phone}
+                          </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(contact.created_at)}
+                        <span className="text-xs text-foreground">
+                          {contact.role ?? (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -265,7 +239,7 @@ export function ContactsClient({ initialContacts, companies }: Props) {
                               Modifier
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setDeleteId(contact.id)}
+                              onClick={() => setDeleting(contact)}
                               className="text-destructive focus:text-destructive"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -280,129 +254,66 @@ export function ContactsClient({ initialContacts, companies }: Props) {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
+              <p className="text-xs text-muted-foreground">
+                Page {safePage} sur {totalPages} —{" "}
+                {(safePage - 1) * PAGE_SIZE + 1}-
+                {Math.min(safePage * PAGE_SIZE, filtered.length)} sur{" "}
+                {filtered.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() =>
+                    setPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={safePage === totalPages}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 
-      {/* Create / Edit Dialog */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Modifier le contact" : "Nouveau contact"}</DialogTitle>
-          </DialogHeader>
+      <ContactDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        contact={editing}
+        companies={companies}
+        onSuccess={() => startTransition(() => router.refresh())}
+      />
 
-          <div className="px-6 pb-2 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Prénom *</Label>
-                <Input
-                  value={form.first_name}
-                  onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
-                  placeholder="Jean"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Nom *</Label>
-                <Input
-                  value={form.last_name}
-                  onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
-                  placeholder="Dupont"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="jean@exemple.com"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Téléphone</Label>
-                <Input
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="+33 6 00 00 00 00"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Poste</Label>
-                <Input
-                  value={form.job_title}
-                  onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
-                  placeholder="Directeur commercial"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Entreprise</Label>
-              <Select
-                value={form.company_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, company_id: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Aucune</SelectItem>
-                  {companies.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Notes</Label>
-              <Textarea
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Notes internes..."
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsOpen(false)}>
-              Annuler
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={loading || !form.first_name || !form.last_name}
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editing ? "Enregistrer" : "Créer"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirm */}
-      <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Supprimer le contact</DialogTitle>
-          </DialogHeader>
-          <p className="px-6 pb-2 text-sm text-muted-foreground">
-            Cette action est irréversible.
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>
-              Annuler
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => deleteId && handleDelete(deleteId)}
-            >
-              Supprimer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteModal
+        open={!!deleting}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        itemType="le contact"
+        itemName={
+          deleting ? `${deleting.first_name} ${deleting.last_name}` : ""
+        }
+        onConfirm={handleDeleted}
+      />
     </>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+      {children}
+    </th>
   );
 }
