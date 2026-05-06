@@ -252,3 +252,23 @@ export interface Notification {
   read_at: string | null;
   created_at: string;
 }
+
+// ============================================================
+// Tags
+// ============================================================
+export type TagEntityType = "contact" | "company" | "deal" | "project";
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface EntityTag {
+  tag_id: string;
+  entity_type: TagEntityType;
+  entity_id: string;
+  created_at: string;
+}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProjectWithDetails } from "@/lib/actions/projects";
 import { getActivitiesForEntity } from "@/lib/actions/activities";
+import { getTagsForEntity } from "@/lib/actions/tags";
 import { ProjectDetailClient } from "@/components/projets/ProjectDetailClient";
 
 export default async function ProjectDetailPage({
@@ -23,6 +24,7 @@ export default async function ProjectDetailPage({
     { data: contacts },
     { data: companies },
     activities,
+    tags,
   ] = await Promise.all([
     supabase
       .from("deals")
@@ -37,6 +39,7 @@ export default async function ProjectDetailPage({
       .order("first_name"),
     supabase.from("companies").select("id, name").order("name"),
     getActivitiesForEntity("project", id),
+    getTagsForEntity("project", id),
   ]);
 
   return (
@@ -50,6 +53,7 @@ export default async function ProjectDetailPage({
       companies={companies ?? []}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       activities={activities as any}
+      tags={tags}
     />
   );
 }

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { EntityTags } from "@/components/tags/entity-tags";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type {
   Activity,
@@ -25,6 +26,7 @@ import type {
   ProjectStatus,
   InvoiceStatus,
   DocumentType,
+  Tag,
 } from "@/types";
 
 const STATUS_CONFIG: Record<
@@ -87,6 +89,7 @@ interface Props {
       avatar_url: string | null;
     } | null;
   })[];
+  tags?: Tag[];
 }
 
 export function ProjectDetailClient({
@@ -97,6 +100,7 @@ export function ProjectDetailClient({
   contacts,
   companies,
   activities = [],
+  tags = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -156,6 +160,12 @@ export function ProjectDetailClient({
                 </span>
               )}
             </div>
+            <EntityTags
+              entityType="project"
+              entityId={project.id}
+              initialTags={tags}
+              className="pt-1"
+            />
           </div>
           <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
             <Pencil className="h-3.5 w-3.5" />

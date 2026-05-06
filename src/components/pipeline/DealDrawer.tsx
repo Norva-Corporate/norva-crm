@@ -30,7 +30,9 @@ import {
   markDealLost,
   type DealInput,
 } from "@/lib/actions/deals";
-import type { DealStage, DealWithRelations } from "@/types";
+import { getTagsForEntity } from "@/lib/actions/tags";
+import { EntityTags } from "@/components/tags/entity-tags";
+import type { DealStage, DealWithRelations, Tag } from "@/types";
 import { STAGES } from "./stages";
 
 interface ContactOption {
@@ -104,6 +106,22 @@ export function DealDrawer({
   const [stagePending, startStageTransition] = useTransition();
   const [deletePending, startDeleteTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [dealTags, setDealTags] = useState<Tag[]>([]);
+
+  // Load tags when drawer opens for an existing deal
+  useEffect(() => {
+    if (!open || !deal?.id) {
+      setDealTags([]);
+      return;
+    }
+    let cancelled = false;
+    getTagsForEntity("deal", deal.id).then((tags) => {
+      if (!cancelled) setDealTags(tags);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, deal?.id]);
 
   // Reset form on open / deal change
   useEffect(() => {
@@ -256,6 +274,18 @@ export function DealDrawer({
                   required
                 />
               </div>
+
+              {/* Tags (édition uniquement) */}
+              {isEdit && deal?.id && (
+                <div className="space-y-1.5">
+                  <Label>Tags</Label>
+                  <EntityTags
+                    entityType="deal"
+                    entityId={deal.id}
+                    initialTags={dealTags}
+                  />
+                </div>
+              )}
 
               {/* Contact (autocomplete) */}
               <div className="space-y-1.5 relative">

@@ -24,9 +24,10 @@ import { Badge } from "@/components/ui/badge";
 import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { CompanyDrawer } from "@/components/contacts/CompanyDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
+import { EntityTags } from "@/components/tags/entity-tags";
 import { deleteCompany } from "@/lib/actions/contacts";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
-import type { Company, Contact, DealStage } from "@/types";
+import type { Company, Contact, DealStage, Tag } from "@/types";
 
 interface DealRow {
   id: string;
@@ -42,6 +43,7 @@ interface Props {
   company: Company;
   contacts: Contact[];
   deals: DealRow[];
+  tags?: Tag[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -53,7 +55,12 @@ const stageLabels: Record<DealStage, string> = {
   lost: "Perdu",
 };
 
-export function CompanyDetailClient({ company, contacts, deals }: Props) {
+export function CompanyDetailClient({
+  company,
+  contacts,
+  deals,
+  tags = [],
+}: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -111,6 +118,11 @@ export function CompanyDetailClient({ company, contacts, deals }: Props) {
                     </Badge>
                   )}
                 </div>
+                <EntityTags
+                  entityType="company"
+                  entityId={company.id}
+                  initialTags={tags}
+                />
                 <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
                   {company.website && (
                     <a

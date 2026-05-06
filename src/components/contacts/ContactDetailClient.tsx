@@ -20,9 +20,10 @@ import { Badge } from "@/components/ui/badge";
 import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { EntityTags } from "@/components/tags/entity-tags";
 import { deleteContact } from "@/lib/actions/contacts";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
-import type { Activity, Contact, Company, DealStage } from "@/types";
+import type { Activity, Contact, Company, DealStage, Tag } from "@/types";
 
 interface DealRow {
   id: string;
@@ -44,6 +45,7 @@ interface Props {
       avatar_url: string | null;
     } | null;
   })[];
+  tags?: Tag[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -60,6 +62,7 @@ export function ContactDetailClient({
   deals,
   companies,
   activities = [],
+  tags = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -118,6 +121,12 @@ export function ContactDetailClient({
                     {contact.company.name}
                   </Link>
                 )}
+                <EntityTags
+                  entityType="contact"
+                  entityId={contact.id}
+                  initialTags={tags}
+                  className="pt-1"
+                />
               </div>
             </div>
 
