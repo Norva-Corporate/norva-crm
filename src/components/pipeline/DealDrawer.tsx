@@ -32,6 +32,8 @@ import {
 } from "@/lib/actions/deals";
 import { getTagsForEntity } from "@/lib/actions/tags";
 import { EntityTags } from "@/components/tags/entity-tags";
+import { AgentButton } from "@/components/agents/agent-button";
+import { Target } from "lucide-react";
 import type { DealStage, DealWithRelations, Tag } from "@/types";
 import { STAGES } from "./stages";
 
@@ -284,6 +286,23 @@ export function DealDrawer({
                     entityId={deal.id}
                     initialTags={dealTags}
                   />
+                </div>
+              )}
+
+              {/* Agents IA (édition uniquement) */}
+              {isEdit && deal?.id && (
+                <div className="space-y-1.5">
+                  <Label>Agents IA</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <AgentButton
+                      agent="rescoring-deal"
+                      entityType="deal"
+                      entityId={deal.id}
+                      shortLabel="Re-scorer ce deal"
+                      icon={Target}
+                      successMessage="Re-scoring en file. Lance l'agent dans multica."
+                    />
+                  </div>
                 </div>
               )}
 

@@ -1,7 +1,11 @@
 # Prompts d'agents multica.ai
 
 Cette section contient les prompts système et les skills des agents
-multica que Kylian utilise pour alimenter Norva CRM.
+multica que Kylian utilise pour alimenter Norva CRM. Tous les agents
+peuvent être déclenchés :
+
+- **manuellement** dans multica avec un prompt
+- **depuis le bouton ✨ dans Norva** (queue table `agent_tasks`)
 
 ## Structure
 
@@ -10,50 +14,60 @@ multica que Kylian utilise pour alimenter Norva CRM.
     ├── prospection-prompt.md             ← Agent Prospection
     ├── enrichissement-prompt.md          ← Agent Enrichissement
     ├── premier-contact-prompt.md         ← Agent Premier Contact
+    ├── audit-site-prompt.md              ← Agent Audit Site
+    ├── rescoring-deal-prompt.md          ← Agent Re-scoring Deal
     └── skills/
-        ├── prospection-google-places/SKILL.md
-        ├── prospection-enrichment-gouv/SKILL.md
-        ├── prospection-site-audit/SKILL.md
-        ├── prospection-email-discovery/SKILL.md
-        ├── prospection-scoring/SKILL.md
-        ├── norva-leads-enrich/SKILL.md           ← UPDATE patterns
-        ├── pain-digital-detection/SKILL.md       ← détecte le pain
-        ├── redaction-cold-outreach/SKILL.md      ← rédige messages
-        └── norva-supabase-insert/SKILL.md        ← INSERT générique
+        ├── prospection-google-places/
+        ├── prospection-enrichment-gouv/
+        ├── prospection-site-audit/
+        ├── prospection-email-discovery/
+        ├── prospection-scoring/
+        ├── norva-leads-enrich/
+        ├── norva-agent-queue/                ← NEW : pull/claim/done
+        ├── pain-digital-detection/
+        ├── redaction-cold-outreach/
+        └── norva-supabase-insert/
 
-## Comment utiliser
+## Le pattern queue (depuis Norva)
 
-### Le prompt principal
+```
+[Bouton ✨ dans Norva (fiche contact, deal drawer, ligne lead)]
+        ↓
+[Server action enqueueAgentTask → INSERT public.agent_tasks pending]
+        ↓
+[Toast "Tâche en file"]
+        ↓
+[Tu ouvres multica → Run sur l'agent correspondant (1 clic, sans prompt)]
+        ↓
+[Skill norva-agent-queue : claim pending tasks (UPDATE running) → traite → UPDATE done]
+        ↓
+[Realtime push vers Norva → AgentTasksPanel et fiche se rafraîchissent]
+```
 
-1. Ouvre `<agent>-prompt.md` dans VS Code
-2. Sélectionne tout (Ctrl+A) → Copie (Ctrl+C)
-3. Multica → l'agent → onglet **Instructions** → colle
-4. Save
+Friction : 2 clics (Norva + multica) au lieu de retaper le prompt à
+chaque fois. Et tu peux mettre en file plusieurs tâches puis tout
+exécuter en un run.
 
-### Les skills
+## Agents disponibles et où les déclencher
 
-Chaque skill est un fichier `SKILL.md` autonome avec un front-matter
-YAML (`name`, `description`) suivi du corps de la procédure.
-
-**Pour les enregistrer dans multica** :
-
-1. Section skills de multica → nouveau skill avec le `name` exact du
-   front-matter
-2. Colle le contenu du fichier (avec ou sans front-matter selon ce
-   que multica accepte)
-3. Sur l'agent → onglet **Skills** → "+ Attach" → coche les skills
-   listées dans le tableau ci-dessous
+| Agent | Bouton dans Norva | Sortie |
+|-------|-------------------|--------|
+| **Prospection** | (manuel uniquement, lance la session) | `lead_imports` (INSERT) |
+| **Enrichissement** | Bouton "Wand" sur ligne lead pending dans `/dashboard/leads` | UPDATE `lead_imports` ou `contacts`/`companies` |
+| **Premier Contact** | Bouton "Kit premier contact" sur fiche contact | INSERT 4 `activities` (drafts) |
+| **Audit Site** | Bouton "Auditer le site" sur fiche contact | INSERT `activity` type=note (rapport markdown) |
+| **Re-scoring Deal** | Bouton "Re-scorer ce deal" dans le drawer du pipeline | INSERT `activity` sur le deal |
 
 ## Pré-requis communs
 
-Voir `docs/multica-integration.md`. Récap :
+Voir `docs/multica-integration.md`. Récap rapide :
 
-### Variables d'environnement (onglet Environment)
+### Variables d'environnement (onglet Environment de chaque agent)
 
 | Variable | Source | Pour quels agents |
 |---|---|---|
-| `GOOGLE_MAPS_API_KEY` | console.cloud.google.com (Places API) | Prospection, Enrichissement (optionnel) |
-| `HUNTER_API_KEY` *(optionnel)* | hunter.io free tier | Prospection, Enrichissement |
+| `GOOGLE_MAPS_API_KEY` | console.cloud.google.com | Prospection (et fallback Enrichissement) |
+| `HUNTER_API_KEY` *(optionnel)* | hunter.io free tier | Email discovery |
 
 ### Custom Args (tous les agents)
 
@@ -64,22 +78,27 @@ Voir `docs/multica-integration.md`. Récap :
 
 Voir `docs/multica-integration.md` étape 2.
 
-## Index des agents
+### Skill `norva-agent-queue` à attacher SI tu veux le mode queue
 
-| Agent multica | Sortie | Skills attachées |
-|---------------|--------|------------------|
-| **Agent Prospection** | INSERT `lead_imports` | google-places, enrichment-gouv, site-audit, email-discovery, scoring, supabase-insert |
-| **Agent Enrichissement** | UPDATE `lead_imports`/`contacts`/`companies` + INSERT `activities` | leads-enrich, enrichment-gouv, email-discovery, site-audit, supabase-insert |
-| **Agent Premier Contact** | INSERT `activities` (drafts) | pain-digital-detection, redaction-cold-outreach, supabase-insert |
+Tous les agents qui ont un bouton dans Norva doivent attacher ce skill
+en plus de leurs skills métier.
+
+## Index des agents (skills à attacher)
+
+| Agent | Skills métier | Skills transverses |
+|-------|---------------|---------------------|
+| Prospection | google-places, enrichment-gouv, site-audit, email-discovery, scoring | norva-supabase-insert |
+| Enrichissement | leads-enrich, enrichment-gouv, email-discovery, site-audit | **norva-agent-queue**, norva-supabase-insert |
+| Premier Contact | pain-digital-detection, redaction-cold-outreach | **norva-agent-queue**, norva-supabase-insert |
+| Audit Site | site-audit | **norva-agent-queue**, norva-supabase-insert |
+| Re-scoring Deal | scoring | **norva-agent-queue**, norva-supabase-insert |
 
 ## Roadmap d'agents (futurs)
 
-Idées priorisées :
-
 | # | Agent | Quand le construire |
 |---|-------|---------------------|
-| 4 | **Agent Suivi Pipeline** (relances auto sur deals stagnants) | Quand pipeline > 20 deals actifs |
-| 5 | **Agent Réactivation Dormants** (récupère contacts >6 mois) | Quand base contacts > 100 |
-| 6 | **Agent Onboarding Won** (setup projet auto sur deal gagné) | Quand >2 deals/mois gagnés |
-| 7 | **Agent Devis Generator** (devis structuré depuis brief) | Quand le temps de prépa devis devient un goulot |
-| 8 | **Agent Veille Signaux** (news/levée/recrutement sur companies) | Pour ABM ciblé sur PME tech |
+| 4 | **Suivi Pipeline** (relances auto sur deals stagnants) | Quand pipeline > 20 deals actifs |
+| 5 | **Réactivation Dormants** | Quand base contacts > 100 |
+| 6 | **Onboarding Won** | Quand >2 deals/mois gagnés |
+| 7 | **Devis Generator** | Quand le temps de prépa devis devient un goulot |
+| 8 | **Veille Signaux** (news/levée/recrutement) | Pour ABM ciblé sur PME tech |

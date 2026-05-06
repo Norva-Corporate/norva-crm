@@ -272,3 +272,42 @@ export interface EntityTag {
   entity_id: string;
   created_at: string;
 }
+
+// ============================================================
+// Agent Tasks
+// ============================================================
+export type AgentTaskStatus =
+  | "pending"
+  | "running"
+  | "done"
+  | "error"
+  | "cancelled";
+
+export type AgentTaskEntityType =
+  | "contact"
+  | "company"
+  | "deal"
+  | "project"
+  | "lead_import";
+
+export type AgentName =
+  | "premier-contact"
+  | "enrichissement"
+  | "audit-site"
+  | "rescoring-deal"
+  | string;
+
+export interface AgentTask {
+  id: string;
+  agent: AgentName;
+  status: AgentTaskStatus;
+  entity_type: AgentTaskEntityType | null;
+  entity_id: string | null;
+  context: Record<string, unknown>;
+  requested_by: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+}

@@ -21,9 +21,19 @@ import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
+import { AgentButton } from "@/components/agents/agent-button";
+import { AgentTasksPanel } from "@/components/agents/agent-tasks-panel";
+import { Sparkles, Globe2 } from "lucide-react";
 import { deleteContact } from "@/lib/actions/contacts";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
-import type { Activity, Contact, Company, DealStage, Tag } from "@/types";
+import type {
+  Activity,
+  AgentTask,
+  Contact,
+  Company,
+  DealStage,
+  Tag,
+} from "@/types";
 
 interface DealRow {
   id: string;
@@ -46,6 +56,7 @@ interface Props {
     } | null;
   })[];
   tags?: Tag[];
+  agentTasks?: AgentTask[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -63,6 +74,7 @@ export function ContactDetailClient({
   companies,
   activities = [],
   tags = [],
+  agentTasks = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -130,7 +142,23 @@ export function ContactDetailClient({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <AgentButton
+                agent="premier-contact"
+                entityType="contact"
+                entityId={contact.id}
+                shortLabel="Kit premier contact"
+                icon={Sparkles}
+                successMessage="Kit en file. Lance l'Agent Premier Contact dans multica pour générer les 4 variantes."
+              />
+              <AgentButton
+                agent="audit-site"
+                entityType="contact"
+                entityId={contact.id}
+                shortLabel="Auditer le site"
+                icon={Globe2}
+                successMessage="Audit en file. Lance l'Agent dans multica."
+              />
               <Button
                 variant="outline"
                 size="sm"
@@ -277,6 +305,12 @@ export function ContactDetailClient({
             )}
           </Card>
         </div>
+
+        <AgentTasksPanel
+          entityType="contact"
+          entityId={contact.id}
+          initialTasks={agentTasks}
+        />
 
         <ActivityTimeline
           entityType="contact"

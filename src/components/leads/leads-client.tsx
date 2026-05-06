@@ -25,6 +25,8 @@ import {
   reopenLead,
   type LeadWithDedup,
 } from "@/lib/actions/leads";
+import { AgentButton } from "@/components/agents/agent-button";
+import { Wand2 } from "lucide-react";
 import { formatRelativeDate, cn } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<
@@ -247,6 +249,14 @@ export function LeadsClient({ leads, companies }: Props) {
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             Convertir
                           </Button>
+                          <AgentButton
+                            agent="enrichissement"
+                            entityType="lead_import"
+                            entityId={lead.id}
+                            shortLabel=""
+                            icon={Wand2}
+                            successMessage="Enrichissement en file. Lance l'agent dans multica."
+                          />
                           {lead.existing_contact_id && (
                             <Button
                               size="sm"

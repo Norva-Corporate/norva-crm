@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { Toaster } from "sonner";
 import { Sidebar } from "@/components/layout/sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
         {children}
       </main>
       <GlobalSearch />
+      <Toaster theme="dark" position="bottom-right" richColors />
     </div>
   );
 }
