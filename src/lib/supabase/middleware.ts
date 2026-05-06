@@ -6,6 +6,8 @@ const PUBLIC_PATHS = new Set(["/", "/login", "/inscription"]);
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname.startsWith("/auth/")) return true;
+  // Webhooks authenticate via their own shared-secret header
+  if (pathname.startsWith("/api/webhooks/")) return true;
   return false;
 }
 
