@@ -47,9 +47,10 @@ const TABS: { key: "pending" | "all" | "converted" | "dismissed"; label: string 
 interface Props {
   leads: LeadWithDedup[];
   companies: { id: string; name: string }[];
+  webhookConfig?: React.ReactNode;
 }
 
-export function LeadsClient({ leads, companies }: Props) {
+export function LeadsClient({ leads, companies, webhookConfig }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<"pending" | "all" | "converted" | "dismissed">(
     "pending"
@@ -306,19 +307,7 @@ export function LeadsClient({ leads, companies }: Props) {
           )}
         </Card>
 
-        {/* Webhook hint */}
-        <Card className="p-4 text-xs text-muted-foreground bg-[var(--muted)]/30">
-          <p className="font-medium text-foreground mb-1">Configuration webhook</p>
-          <p>
-            URL : <code className="font-mono">POST /api/webhooks/multica</code>{" "}
-            · Header :{" "}
-            <code className="font-mono">x-webhook-secret: $MULTICA_WEBHOOK_SECRET</code>
-          </p>
-          <p className="mt-1">
-            Le payload est extrait automatiquement (email, nom, entreprise,
-            domaine, etc.). Le format brut est conservé pour audit.
-          </p>
-        </Card>
+        {webhookConfig}
       </div>
 
       <ConvertLeadDrawer

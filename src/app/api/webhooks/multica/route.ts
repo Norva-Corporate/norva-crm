@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // Source tagging (?source= query param or x-source header, default "multica")
+  const url = new URL(req.url);
+  const source =
+    req.headers.get("x-source") ??
+    url.searchParams.get("source") ??
+    "multica";
+
   let body: unknown;
   try {
     body = await req.json();
@@ -53,22 +60,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "no leads in payload" }, { status: 400 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
+  if (!supabaseUrl || !serviceKey) {
     return NextResponse.json(
       { error: "server misconfigured (missing supabase env)" },
       { status: 500 }
     );
   }
-  const supabase = createClient(url, serviceKey, {
+  const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
   });
 
   const rows = items.map((item) => {
     const f = extractLeadFields(item);
     return {
-      source: "multica",
+      source,
       external_id: f.externalId,
       email: f.email,
       first_name: f.firstName,
@@ -113,5 +120,6 @@ export async function POST(req: NextRequest) {
     received: items.length,
     inserted,
     duplicates: items.length - inserted,
+    source,
   });
 }
