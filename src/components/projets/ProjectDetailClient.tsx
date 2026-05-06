@@ -17,8 +17,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Project, ProjectStatus, InvoiceStatus, DocumentType } from "@/types";
+import type {
+  Activity,
+  Project,
+  ProjectStatus,
+  InvoiceStatus,
+  DocumentType,
+} from "@/types";
 
 const STATUS_CONFIG: Record<
   ProjectStatus,
@@ -73,6 +80,13 @@ interface Props {
   projects: { id: string; name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
   companies: { id: string; name: string }[];
+  activities?: (Activity & {
+    author?: {
+      id: string;
+      full_name: string | null;
+      avatar_url: string | null;
+    } | null;
+  })[];
 }
 
 export function ProjectDetailClient({
@@ -82,6 +96,7 @@ export function ProjectDetailClient({
   projects,
   contacts,
   companies,
+  activities = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -350,6 +365,13 @@ export function ProjectDetailClient({
             </>
           )}
         </Card>
+
+        {/* Activity timeline */}
+        <ActivityTimeline
+          entityType="project"
+          entityId={project.id}
+          initialActivities={activities}
+        />
       </div>
 
       <ProjectDrawer

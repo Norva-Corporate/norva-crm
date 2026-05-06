@@ -19,9 +19,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { deleteContact } from "@/lib/actions/contacts";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
-import type { Contact, Company, DealStage } from "@/types";
+import type { Activity, Contact, Company, DealStage } from "@/types";
 
 interface DealRow {
   id: string;
@@ -36,6 +37,13 @@ interface Props {
   contact: Contact & { company: Company | null };
   deals: DealRow[];
   companies: { id: string; name: string }[];
+  activities?: (Activity & {
+    author?: {
+      id: string;
+      full_name: string | null;
+      avatar_url: string | null;
+    } | null;
+  })[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -47,7 +55,12 @@ const stageLabels: Record<DealStage, string> = {
   lost: "Perdu",
 };
 
-export function ContactDetailClient({ contact, deals, companies }: Props) {
+export function ContactDetailClient({
+  contact,
+  deals,
+  companies,
+  activities = [],
+}: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -255,6 +268,12 @@ export function ContactDetailClient({ contact, deals, companies }: Props) {
             )}
           </Card>
         </div>
+
+        <ActivityTimeline
+          entityType="contact"
+          entityId={contact.id}
+          initialActivities={activities}
+        />
       </div>
 
       <ContactDrawer

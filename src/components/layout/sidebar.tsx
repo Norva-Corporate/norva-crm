@@ -10,6 +10,7 @@ import {
   Kanban,
   FolderKanban,
   FileText,
+  CheckSquare,
   UserCircle,
   LogOut,
   PanelLeftClose,
@@ -28,6 +29,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Tâches", href: "/dashboard/taches", icon: CheckSquare },
   { label: "Contacts", href: "/dashboard/contacts", icon: Users },
   { label: "Entreprises", href: "/dashboard/companies", icon: Building2 },
   { label: "Pipeline", href: "/dashboard/pipeline", icon: Kanban },

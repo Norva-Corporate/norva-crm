@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Search, Bell, Plus } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GLOBAL_SEARCH_OPEN_EVENT } from "@/components/global-search";
+import { NotificationBell } from "@/components/notification-bell";
 
 interface HeaderProps {
   title: string;
@@ -47,9 +48,7 @@ export function Header({ title, action }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
-        <button className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--muted)] transition-colors">
-          <Bell className="h-4 w-4" />
-        </button>
+        <NotificationBell />
         {action && (
           <Button size="sm" onClick={action.onClick} className="h-8 text-xs gap-1.5">
             <Plus className="h-3.5 w-3.5" />

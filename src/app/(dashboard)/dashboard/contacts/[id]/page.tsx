@@ -2,6 +2,7 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContactWithDeals } from "@/lib/actions/contacts";
+import { getActivitiesForEntity } from "@/lib/actions/activities";
 import { ContactDetailClient } from "@/components/contacts/ContactDetailClient";
 
 interface PageProps {
@@ -15,10 +16,10 @@ export default async function ContactDetailPage({ params }: PageProps) {
   if (!contact) notFound();
 
   const supabase = await createClient();
-  const { data: companies } = await supabase
-    .from("companies")
-    .select("id, name")
-    .order("name");
+  const [{ data: companies }, activities] = await Promise.all([
+    supabase.from("companies").select("id, name").order("name"),
+    getActivitiesForEntity("contact", id),
+  ]);
 
   return (
     <div className="flex flex-col flex-1">
@@ -26,6 +27,8 @@ export default async function ContactDetailPage({ params }: PageProps) {
         contact={contact}
         deals={contact.deals}
         companies={companies ?? []}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        activities={activities as any}
       />
     </div>
   );

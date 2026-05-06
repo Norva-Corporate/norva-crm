@@ -176,3 +176,79 @@ export interface CompanyWithRelations extends Company {
   contacts: Contact[];
   deals: DealWithRelations[];
 }
+
+// ============================================================
+// Tasks
+// ============================================================
+export type TaskStatus = "pending" | "in_progress" | "done" | "cancelled";
+export type TaskPriority = "low" | "normal" | "high" | "urgent";
+export type TaskRelatedType = "contact" | "company" | "deal" | "project";
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: string | null;
+  related_type: TaskRelatedType | null;
+  related_id: string | null;
+  assigned_to: string | null;
+  assignee?: Profile | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Activities
+// ============================================================
+export type ActivityEntityType =
+  | "contact"
+  | "company"
+  | "deal"
+  | "project"
+  | "invoice";
+
+export type ActivityType =
+  | "deal_created"
+  | "deal_stage_changed"
+  | "invoice_created"
+  | "invoice_status_changed"
+  | "project_created"
+  | "project_status_changed"
+  | "note"
+  | "call"
+  | "meeting"
+  | "email";
+
+export interface Activity {
+  id: string;
+  type: ActivityType | string;
+  entity_type: ActivityEntityType;
+  entity_id: string;
+  payload: Record<string, unknown> | null;
+  created_by: string | null;
+  author?: Pick<Profile, "id" | "full_name" | "avatar_url"> | null;
+  created_at: string;
+}
+
+// ============================================================
+// Notifications
+// ============================================================
+export type NotificationType =
+  | "task_assigned"
+  | "deal_assigned"
+  | "invoice_paid"
+  | string;
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read_at: string | null;
+  created_at: string;
+}
