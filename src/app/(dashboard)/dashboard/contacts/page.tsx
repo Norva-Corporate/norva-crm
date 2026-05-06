@@ -1,10 +1,10 @@
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
-import { Header } from "@/components/layout/header";
 import { ContactsClient } from "@/components/contacts/contacts-client";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
+
   const { data: contacts } = await supabase
     .from("contacts")
     .select("*, company:companies(id, name)")

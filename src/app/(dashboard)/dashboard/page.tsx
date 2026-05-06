@@ -35,7 +35,7 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof createClien
     supabase
       .from("invoices")
       .select("total, status")
-      .in("status", ["sent", "paid"]),
+      .in("status", ["envoyee", "payee"]),
   ]);
 
   const pipeline = (deals ?? []).reduce(
@@ -48,7 +48,7 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof createClien
   );
 
   const revenue = (invoices ?? [])
-    .filter((i) => i.status === "paid")
+    .filter((i) => i.status === "payee")
     .reduce((acc, i) => acc + (i.total ?? 0), 0);
 
   return { contactsCount, companiesCount, pipeline, revenue, recentDeals };
@@ -118,7 +118,7 @@ export default async function DashboardPage() {
       title: "CA encaissé",
       value: formatCurrency(revenue),
       icon: FileText,
-      href: "/dashboard/billing",
+      href: "/dashboard/facturation",
       color: "text-[#4ADE80]",
       bg: "bg-[#22C55E]/10",
     },

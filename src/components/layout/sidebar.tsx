@@ -31,8 +31,8 @@ const navItems: NavItem[] = [
   { label: "Contacts", href: "/dashboard/contacts", icon: Users },
   { label: "Entreprises", href: "/dashboard/companies", icon: Building2 },
   { label: "Pipeline", href: "/dashboard/pipeline", icon: Kanban },
-  { label: "Projets", href: "/dashboard/projects", icon: FolderKanban },
-  { label: "Facturation", href: "/dashboard/billing", icon: FileText },
+  { label: "Projets", href: "/dashboard/projets", icon: FolderKanban },
+  { label: "Facturation", href: "/dashboard/facturation", icon: FileText },
 ];
 
 interface SidebarProps {

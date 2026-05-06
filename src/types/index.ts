@@ -14,7 +14,7 @@ export interface Company {
   id: string;
   name: string;
   domain: string | null;
-  industry: string | null;
+  sector: string | null;
   size: string | null;
   website: string | null;
   phone: string | null;
@@ -31,7 +31,7 @@ export interface Contact {
   last_name: string;
   email: string | null;
   phone: string | null;
-  job_title: string | null;
+  role: string | null;
   company_id: string | null;
   company?: Company;
   notes: string | null;
@@ -68,11 +68,11 @@ export interface Deal {
 }
 
 export type ProjectStatus =
-  | "planning"
-  | "active"
-  | "on_hold"
-  | "completed"
-  | "cancelled";
+  | "en_attente"
+  | "en_cours"
+  | "en_pause"
+  | "termine"
+  | "annule";
 
 export interface Project {
   id: string;
@@ -92,11 +92,11 @@ export interface Project {
 }
 
 export type InvoiceStatus =
-  | "draft"
-  | "sent"
-  | "paid"
-  | "overdue"
-  | "cancelled";
+  | "brouillon"
+  | "envoyee"
+  | "payee"
+  | "en_retard"
+  | "annulee";
 
 export type DocumentType = "quote" | "invoice";
 
@@ -159,11 +159,20 @@ export interface ContactWithRelations {
   last_name: string;
   email: string | null;
   phone: string | null;
-  job_title: string | null;
+  role: string | null;
   company_id: string | null;
   company: Company | null;
   notes: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ContactWithDeals extends ContactWithRelations {
+  deals: DealWithRelations[];
+}
+
+export interface CompanyWithRelations extends Company {
+  contacts: Contact[];
+  deals: DealWithRelations[];
 }
