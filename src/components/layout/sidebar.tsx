@@ -11,6 +11,8 @@ import {
   FolderKanban,
   FileText,
   CheckSquare,
+  CalendarDays,
+  BarChart3,
   UserCircle,
   LogOut,
   PanelLeftClose,
@@ -30,11 +32,13 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
   { label: "Tâches", href: "/dashboard/taches", icon: CheckSquare },
+  { label: "Calendrier", href: "/dashboard/calendrier", icon: CalendarDays },
   { label: "Contacts", href: "/dashboard/contacts", icon: Users },
   { label: "Entreprises", href: "/dashboard/companies", icon: Building2 },
   { label: "Pipeline", href: "/dashboard/pipeline", icon: Kanban },
   { label: "Projets", href: "/dashboard/projets", icon: FolderKanban },
   { label: "Facturation", href: "/dashboard/facturation", icon: FileText },
+  { label: "Reporting", href: "/dashboard/reporting", icon: BarChart3 },
 ];
 
 interface SidebarProps {
