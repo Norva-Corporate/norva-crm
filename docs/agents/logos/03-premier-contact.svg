@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Agent Premier Contact — Bleu, avion en papier -->
+  <rect width="512" height="512" rx="96" fill="#3B82F6"/>
+  <!-- Avion en papier -->
+  <g transform="translate(256 256) rotate(-25)">
+    <!-- Aile principale -->
+    <path d="M -150 -10
+             L 170 -110
+             L 60 50
+             L -150 -10 Z"
+          fill="#FFFFFF"/>
+    <!-- Ombre / pli central -->
+    <path d="M -150 -10
+             L 60 50
+             L 30 100
+             L -150 -10 Z"
+          fill="#FFFFFF" opacity="0.7"/>
+  </g>
+  <!-- Trajectoire en pointillés -->
+  <path d="M 70 380 Q 200 300 110 250"
+        fill="none" stroke="#FFFFFF" stroke-width="6"
+        stroke-linecap="round" stroke-dasharray="4 16" opacity="0.5"/>
+</svg>
