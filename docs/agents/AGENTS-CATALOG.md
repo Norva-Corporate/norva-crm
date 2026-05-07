@@ -8,15 +8,18 @@ et leur statut.
 
 ### 1. Agent Prospection 🔍
 
-**Fonction** : Découvre de nouveaux prospects (artisans, TPE, commerces
-locaux, petites startups FR) selon des critères de ciblage donnés,
-les qualifie sur 4 axes (Fit/Pain/Reach/Budget) et les insère dans
-`lead_imports`.
+**Fonction** : Découvre de nouveaux prospects (artisans, TPE, PME, ETI,
+commerces locaux, petites startups FR) selon des critères de ciblage
+donnés, les qualifie sur 4 axes équipondérés (Fit/Pain/Reach/Budget,
+25 % chacun) et les insère dans `lead_imports`. Seuil de SKIP à 0.30.
 
 - **Trigger** : Manuel dans multica, prompt avec critère
-  *(ex. "5 coiffeurs sans site à Lyon")*
+  *(ex. "5 coiffeurs sans site à Lyon" ou "10 PME industrielles
+  20-200 salariés en Auvergne-Rhône-Alpes")*
 - **Sources** : Google Places API, API gouv FR (recherche-entreprises),
-  mentions légales des sites, Pages Jaunes, Pappers, Hunter.io
+  mentions légales des sites, **LinkedIn (Sales Navigator + scraping
+  de profils publics)**, **scraping web libre** (Pages Jaunes,
+  Societe.com, Pappers complet, annuaires métiers), Hunter.io
   (optionnel)
 - **Sortie** : INSERT `lead_imports` avec `source='multica-prospection'`
 - **Volume** : 5-20 prospects par run
