@@ -38,7 +38,6 @@ export function MessageThreadPanel({
           `*, author:profiles!discussion_messages_user_id_fkey(id, full_name, avatar_url, email)`
         )
         .eq("parent_id", parent.id)
-        .is("deleted_at", null)
         .order("created_at", { ascending: true });
       if (cancelled) return;
       setReplies((data ?? []) as DiscussionMessage[]);

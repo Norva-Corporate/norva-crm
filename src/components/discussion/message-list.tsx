@@ -80,12 +80,12 @@ export function MessageList({
       const supabase = createClient();
       const { data } = await supabase
         .from("discussion_messages")
-        .select("parent_id")
-        .in("parent_id", ids)
-        .is("deleted_at", null);
+        .select("parent_id, deleted_at")
+        .in("parent_id", ids);
       if (cancelled || !data) return;
       const counts: Record<string, number> = {};
       for (const row of data) {
+        if (row.deleted_at) continue; // count only active replies
         const pid = row.parent_id as string;
         counts[pid] = (counts[pid] ?? 0) + 1;
       }

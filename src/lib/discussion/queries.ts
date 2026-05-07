@@ -42,6 +42,7 @@ export async function listChannelsWithUnread(
   const counts = await Promise.all(
     list.map(async (c) => {
       const lastRead = lastReadByChannel.get(c.id);
+      // Unread = non-deleted messages from others since last_read
       const baseQuery = supabase
         .from("discussion_messages")
         .select("id", { count: "exact", head: true })
@@ -84,6 +85,8 @@ export async function listChannelMessages(
   limit = 100
 ): Promise<DiscussionMessage[]> {
   const supabase = await createClient();
+  // Soft-deleted messages stay in the list — UI renders them as
+  // <DeletedMessageItem /> ("Message supprimé").
   const { data, error } = await supabase
     .from("discussion_messages")
     .select(
@@ -91,7 +94,6 @@ export async function listChannelMessages(
     )
     .eq("channel_id", channelId)
     .is("parent_id", null)
-    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
@@ -111,7 +113,6 @@ export async function listThreadMessages(
       `*, author:profiles!discussion_messages_user_id_fkey(id, full_name, avatar_url, email)`
     )
     .eq("parent_id", parentId)
-    .is("deleted_at", null)
     .order("created_at", { ascending: true });
   if (error) {
     console.error("[discussion.listThreadMessages]", error);
