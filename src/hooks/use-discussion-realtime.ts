@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { DiscussionMessage } from "@/types";
 
@@ -13,6 +13,10 @@ type Handlers = {
 /**
  * Subscribe to a single channel's messages (parent thread + replies).
  * Reproduces the pattern from notification-bell.tsx.
+ *
+ * Channel name carries a per-instance suffix so that several components
+ * subscribing to the same channelId (e.g. MessageList + ThreadPanel) do
+ * not collide on supabase-js's channel deduplication.
  */
 export function useDiscussionRealtime(
   channelId: string | null,
@@ -20,12 +24,13 @@ export function useDiscussionRealtime(
 ) {
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
+  const instanceId = useId();
 
   useEffect(() => {
     if (!channelId) return;
     const supabase = createClient();
     const channel = supabase
-      .channel(`discussion:${channelId}`)
+      .channel(`discussion:${channelId}:${instanceId}`)
       .on(
         "postgres_changes",
         {
@@ -55,23 +60,26 @@ export function useDiscussionRealtime(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [channelId]);
+  }, [channelId, instanceId]);
 }
 
 /**
- * Global subscription to all messages (used to update the sidebar
- * total unread badge). Returns nothing — caller wires handlers.
+ * Global subscription to all message inserts (used to update the sidebar
+ * total unread badge). Per-instance suffix on the channel name avoids the
+ * "cannot add postgres_changes after subscribe()" error when several hooks
+ * mount simultaneously (Sidebar + ChannelSidebar both depend on it).
  */
 export function useGlobalMessagesRealtime(
   onInsert: (message: DiscussionMessage) => void
 ) {
   const onInsertRef = useRef(onInsert);
   onInsertRef.current = onInsert;
+  const instanceId = useId();
 
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel("discussion:global")
+      .channel(`discussion:global:${instanceId}`)
       .on(
         "postgres_changes",
         {
@@ -88,5 +96,5 @@ export function useGlobalMessagesRealtime(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [instanceId]);
 }
