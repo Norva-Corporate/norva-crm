@@ -1,6 +1,6 @@
 ---
 name: prospection-email-discovery
-description: Use this skill to find a French prospect's professional email address through deep multi-source search. Priority order is mentions-légales (mandatory by French LCEN law on commercial websites), full multi-page site crawl with sitemap discovery, Pages Jaunes, Pappers, social profiles, Google search for plain-text email mentions, and Hunter.io free tier as last resort. Realistic hit rate is 30-50% for French TPE/artisans. Best-effort and non-blocking — never fabricates addresses.
+description: Use this skill to find a prospect's email address (pro OR personal) through deep multi-source search. Priority order is mentions-légales (mandatory by French LCEN law on commercial websites), LinkedIn (Sales Navigator + public profile scraping), full multi-page site crawl with sitemap discovery, Pages Jaunes, Pappers, social profiles, Google search for plain-text email mentions, and Hunter.io free tier as last resort. All email formats accepted (pro and personal — gmail, yahoo, outlook, etc.). Best-effort and non-blocking — never fabricates addresses.
 ---
 
 # Skill — Recherche email professionnel (deep search)
@@ -58,6 +58,36 @@ Cherche avec WebFetch et extrais avec regex :
 - SIRET : `\b\d{14}\b`
 - Nom du gérant : juste après "représenté(e) par",
   "directeur de la publication :", "responsable :"
+
+### 1bis. PRIORITAIRE (équivalent à l'étape 1) — LinkedIn
+
+À tenter **en parallèle** des mentions légales, particulièrement pour
+startups / PME / ETI où LinkedIn donne souvent plus que les mentions
+légales (décisionnaire identifié, parfois email pro exposé).
+
+**Sales Navigator (si dispo)** :
+
+- Recherche par entreprise + filtres seniority (CEO, founder, head of,
+  directeur, gérant)
+- Récupérer prénom + nom + intitulé du poste
+- L'export d'email Sales Nav (via add-on type Lusha/Apollo) est
+  autorisé si vous avez un abonnement
+
+**Profils publics (sans Sales Nav)** :
+
+- Recherche Google : `site:linkedin.com/in "<entreprise>" <ville>`
+- Recherche Google : `site:linkedin.com/company/<slug>`
+- Scraping autorisé sur le HTML public des profils et pages entreprise
+  (la page "À propos" expose souvent un email)
+
+Ce que tu cherches :
+
+- Email pro ou perso exposé dans la bio / contact info
+- Prénom + nom + titre du dirigeant (alimente Reach + l'enrichissement
+  gouv si match)
+- URL LinkedIn elle-même (à stocker dans `raw_payload.linkedin`)
+
+Note dans `raw_payload.sources` : `"linkedin"` quand utilisé.
 
 ### 2. Sitemap.xml + crawl multi-pages
 
@@ -157,22 +187,35 @@ en `email`) :
 ❌ **Ne jamais insérer un email deviné dans le champ `email`** — risque
 de bouncing et de blacklist domaine. Toujours garder NULL.
 
-## Filtre obligatoire sur l'email trouvé
+## Tous formats d'emails acceptés
 
-Email **rejeté** (= NULL pro, mais noté en perso) si domaine dans :
+**Tous les emails sont acceptés en `email`**, qu'ils soient pro ou
+persos (gmail, yahoo, outlook, free.fr, orange.fr, icloud, proton,
+etc.). On ne filtre plus.
 
-    gmail.com, yahoo.com, yahoo.fr, hotmail.com, hotmail.fr,
-    outlook.com, outlook.fr, icloud.com, free.fr, orange.fr,
-    wanadoo.fr, laposte.net, sfr.fr, aol.com, live.com, live.fr,
-    bbox.fr, neuf.fr, gmx.fr, gmx.com, protonmail.com, proton.me,
-    me.com, mac.com
+**Préférence (si plusieurs trouvés)** :
 
-Dans ce cas :
+1. Email pro exact du dirigeant (`prenom.nom@<domaine_entreprise>`)
+2. Email pro générique (`contact@`, `info@`, `direction@`)
+3. Email perso du dirigeant (gmail, yahoo, etc.)
+4. Email perso générique trouvé dans une fiche commerciale
 
-- `email` = `NULL` dans `lead_imports`
-- `raw_payload.contact_email_personal` = `<email perso>`
-- Note dans `raw_payload.notes` : "Pas d'adresse pro publique,
-  contact perso sur <provider> à valider à l'oral d'abord"
+**Tagger systématiquement** dans `raw_payload` :
+
+    "email_type": "pro" | "personal"
+
+Règle de classification :
+
+- `pro` si le domaine de l'email matche le `company_domain`
+- `personal` si domaine grand public (gmail.com, yahoo.com,
+  hotmail.com, outlook.com, icloud.com, free.fr, orange.fr,
+  wanadoo.fr, laposte.net, sfr.fr, aol.com, live.com, live.fr,
+  bbox.fr, neuf.fr, gmx.fr, gmx.com, protonmail.com, proton.me,
+  me.com, mac.com)
+- `pro` par défaut sinon
+
+Si email perso, ajouter dans `raw_payload.notes` :
+"Email perso (`<provider>`) — à valider à l'oral avant cold mail."
 
 ## Cas "rien trouvé"
 
@@ -199,10 +242,13 @@ Pour traçabilité :
 
 - ❌ JAMAIS inventer un email basé sur supposition + insérer dans
   `email`. Les patterns vont dans `notes` uniquement.
-- ❌ Email perso ne va JAMAIS dans `email`, toujours dans
-  `contact_email_personal`.
+- ✅ Tous formats d'email acceptés en `email` (pro ou perso).
+  Toujours tagger `raw_payload.email_type` (`"pro"` ou `"personal"`).
 - ✅ Toujours minuscules.
-- ✅ Si plusieurs emails pro trouvés, préfère celui qui correspond
-  au dirigeant identifié, sinon `contact@` ou `info@` ou `direction@`.
+- ✅ Si plusieurs emails trouvés, préférer dans l'ordre : email pro
+  du dirigeant > email pro générique (`contact@`, `info@`,
+  `direction@`) > email perso du dirigeant > email perso générique.
 - ✅ Si tu trouves un SIRET dans /mentions-legales, ajoute-le aussi
   dans `raw_payload.siret` (peut servir si l'API gouv n'a pas matché).
+- ✅ Si tu trouves un profil LinkedIn, stocke l'URL dans
+  `raw_payload.linkedin`.
