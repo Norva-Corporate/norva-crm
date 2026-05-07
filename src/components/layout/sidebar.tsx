@@ -18,22 +18,27 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Plug,
+  MessagesSquare,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { logoutAction } from "@/app/(auth)/actions";
+import { useDiscussionUnreadTotal } from "@/hooks/use-unread-counts";
 import type { Profile } from "@/types";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  badgeKey?: "discussion";
 }
 
 const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
   { label: "Tâches", href: "/dashboard/taches", icon: CheckSquare },
   { label: "Calendrier", href: "/dashboard/calendrier", icon: CalendarDays },
+  { label: "Discussion", href: "/dashboard/discussion", icon: MessagesSquare, badgeKey: "discussion" },
   { label: "Leads", href: "/dashboard/leads", icon: Sparkles },
   { label: "Contacts", href: "/dashboard/contacts", icon: Users },
   { label: "Entreprises", href: "/dashboard/companies", icon: Building2 },
@@ -41,6 +46,7 @@ const navItems: NavItem[] = [
   { label: "Projets", href: "/dashboard/projets", icon: FolderKanban },
   { label: "Facturation", href: "/dashboard/facturation", icon: FileText },
   { label: "Reporting", href: "/dashboard/reporting", icon: BarChart3 },
+  { label: "Intégrations", href: "/dashboard/integrations", icon: Plug },
 ];
 
 interface SidebarProps {
@@ -52,6 +58,10 @@ interface SidebarProps {
 export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const isProfilActive = pathname.startsWith("/dashboard/profil");
+  const discussionUnread = useDiscussionUnreadTotal();
+  const badgeCounts: Record<NonNullable<NavItem["badgeKey"]>, number> = {
+    discussion: discussionUnread,
+  };
 
   return (
     <aside
@@ -99,13 +109,15 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
               ? pathname === "/dashboard"
               : pathname.startsWith(item.href);
 
+          const badge = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
+
           return (
             <Link
               key={item.href}
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center h-9 text-sm transition-colors group",
+                "relative flex items-center h-9 text-sm transition-colors group",
                 collapsed ? "justify-center" : "gap-2.5 px-2.5",
                 isActive
                   ? "bg-accent/15 text-accent"
@@ -120,7 +132,15 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
                     : "text-[var(--sidebar-muted)] group-hover:text-foreground"
                 )}
               />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+              {badge > 0 &&
+                (collapsed ? (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent" />
+                ) : (
+                  <span className="ml-auto min-w-[18px] h-[18px] px-1.5 flex items-center justify-center text-[10px] font-semibold bg-accent text-white rounded-full">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                ))}
             </Link>
           );
         })}

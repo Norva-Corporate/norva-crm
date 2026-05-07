@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type { DealStage, DealWithRelations } from "@/types";
 
 // ============================================================
@@ -109,6 +110,9 @@ export async function createDeal(
     return { success: false, error: error?.message ?? "Création impossible." };
   }
 
+  void syncEntityToAllConnectedUsers("deal", inserted.id).catch((e) =>
+    console.error("[gcal sync] createDeal:", e)
+  );
   revalidateDeals();
   return { success: true, data: inserted as unknown as DealWithRelations };
 }
@@ -153,6 +157,9 @@ export async function updateDeal(
     return { success: false, error: error?.message ?? "Mise à jour impossible." };
   }
 
+  void syncEntityToAllConnectedUsers("deal", id).catch((e) =>
+    console.error("[gcal sync] updateDeal:", e)
+  );
   revalidateDeals();
   return { success: true, data: updated as unknown as DealWithRelations };
 }
@@ -176,6 +183,9 @@ export async function updateDealStage(
 
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("deal", id).catch((e) =>
+    console.error("[gcal sync] updateDealStage:", e)
+  );
   revalidateDeals();
   return { success: true, data: null };
 }
@@ -199,6 +209,9 @@ export async function deleteDeal(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("deals").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("deal", id).catch((e) =>
+    console.error("[gcal sync] deleteDeal:", e)
+  );
   revalidateDeals();
   return { success: true, data: null };
 }

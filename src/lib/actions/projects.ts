@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type { ProjectStatus } from "@/types";
 
 // ============================================================
@@ -93,6 +94,9 @@ export async function createProject(
     return { success: false, error: error?.message ?? "Création impossible." };
   }
 
+  void syncEntityToAllConnectedUsers("project", inserted.id).catch((e) =>
+    console.error("[gcal sync] createProject:", e)
+  );
   revalidateProjects();
   return { success: true, data: { id: inserted.id } };
 }
@@ -129,6 +133,9 @@ export async function updateProject(
 
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("project", id).catch((e) =>
+    console.error("[gcal sync] updateProject:", e)
+  );
   revalidateProjects(id);
   return { success: true, data: null };
 }
@@ -152,6 +159,9 @@ export async function updateProjectStatus(
 
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("project", id).catch((e) =>
+    console.error("[gcal sync] updateProjectStatus:", e)
+  );
   revalidateProjects(id);
   return { success: true, data: null };
 }
@@ -164,6 +174,9 @@ export async function deleteProject(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("project", id).catch((e) =>
+    console.error("[gcal sync] deleteProject:", e)
+  );
   revalidateProjects();
   return { success: true, data: null };
 }

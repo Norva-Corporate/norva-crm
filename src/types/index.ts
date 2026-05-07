@@ -240,6 +240,7 @@ export type NotificationType =
   | "task_assigned"
   | "deal_assigned"
   | "invoice_paid"
+  | "discussion_mention"
   | string;
 
 export interface Notification {
@@ -310,4 +311,62 @@ export interface AgentTask {
   completed_at: string | null;
   result: Record<string, unknown> | null;
   error: string | null;
+}
+
+// ============================================================
+// Discussion (messagerie interne)
+// ============================================================
+export type MentionType =
+  | "user"
+  | "company"
+  | "contact"
+  | "project"
+  | "task"
+  | "invoice";
+
+export interface Mention {
+  type: MentionType;
+  id: string;
+  label: string;
+}
+
+export interface Attachment {
+  path: string;
+  name: string;
+  size: number;
+  mime: string;
+}
+
+export interface DiscussionChannel {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscussionMessage {
+  id: string;
+  channel_id: string;
+  user_id: string | null;
+  content: string;
+  parent_id: string | null;
+  attachments: Attachment[];
+  mentions: Mention[];
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  author?: Pick<Profile, "id" | "full_name" | "avatar_url" | "email"> | null;
+}
+
+export interface DiscussionRead {
+  user_id: string;
+  channel_id: string;
+  last_read_at: string;
+}
+
+export interface ChannelWithUnread extends DiscussionChannel {
+  unread_count: number;
+  last_read_at: string | null;
 }

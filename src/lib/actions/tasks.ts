@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type {
   TaskPriority,
   TaskRelatedType,
@@ -100,6 +101,9 @@ export async function createTask(
     return { success: false, error: error?.message ?? "Création impossible." };
   }
 
+  void syncEntityToAllConnectedUsers("task", inserted.id).catch((e) =>
+    console.error("[gcal sync] createTask:", e)
+  );
   revalidateTasks(data.related_type, data.related_id);
   return { success: true, data: { id: inserted.id } };
 }
@@ -134,6 +138,9 @@ export async function updateTask(
   const { error } = await supabase.from("tasks").update(payload).eq("id", id);
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("task", id).catch((e) =>
+    console.error("[gcal sync] updateTask:", e)
+  );
   revalidateTasks(data.related_type, data.related_id);
   return { success: true, data: null };
 }
@@ -152,6 +159,9 @@ export async function updateTaskStatus(
     .eq("id", id);
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("task", id).catch((e) =>
+    console.error("[gcal sync] updateTaskStatus:", e)
+  );
   revalidateTasks();
   return { success: true, data: null };
 }
@@ -161,6 +171,9 @@ export async function deleteTask(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("task", id).catch((e) =>
+    console.error("[gcal sync] deleteTask:", e)
+  );
   revalidateTasks();
   return { success: true, data: null };
 }

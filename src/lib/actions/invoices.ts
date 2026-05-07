@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type { DocumentType, InvoiceStatus } from "@/types";
 
 // ============================================================
@@ -159,6 +160,9 @@ export async function createInvoice(
     }
   }
 
+  void syncEntityToAllConnectedUsers("invoice", inserted.id).catch((e) =>
+    console.error("[gcal sync] createInvoice:", e)
+  );
   revalidateInvoices();
   return { success: true, data: { id: inserted.id } };
 }
@@ -228,6 +232,9 @@ export async function updateInvoice(
     if (itemsErr) return { success: false, error: itemsErr.message };
   }
 
+  void syncEntityToAllConnectedUsers("invoice", id).catch((e) =>
+    console.error("[gcal sync] updateInvoice:", e)
+  );
   revalidateInvoices(id);
   return { success: true, data: null };
 }
@@ -251,6 +258,9 @@ export async function updateInvoiceStatus(
 
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("invoice", id).catch((e) =>
+    console.error("[gcal sync] updateInvoiceStatus:", e)
+  );
   revalidateInvoices(id);
   return { success: true, data: null };
 }
@@ -263,6 +273,9 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
   const { error } = await supabase.from("invoices").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
 
+  void syncEntityToAllConnectedUsers("invoice", id).catch((e) =>
+    console.error("[gcal sync] deleteInvoice:", e)
+  );
   revalidateInvoices();
   return { success: true, data: null };
 }
@@ -365,6 +378,9 @@ export async function convertQuoteToInvoice(
     }
   }
 
+  void syncEntityToAllConnectedUsers("invoice", inserted.id).catch((e) =>
+    console.error("[gcal sync] convertQuoteToInvoice:", e)
+  );
   revalidateInvoices(inserted.id);
   return { success: true, data: { id: inserted.id } };
 }
