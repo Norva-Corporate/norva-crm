@@ -21,6 +21,18 @@ export type LeadStatus =
 
 export type LeadTemperature = "cold" | "warm" | "hot";
 
+// ============================================================
+// Pipeline kanban (017)
+// ============================================================
+export type LeadPipelineStage =
+  | "brut"
+  | "verified"
+  | "to_contact"
+  | "contacted"
+  | "in_discussion";
+
+export type LeadEmailVerified = "valid" | "risky" | "invalid" | "unverified";
+
 export interface LeadImport {
   id: string;
   source: string;
@@ -48,6 +60,16 @@ export interface LeadImport {
   next_follow_up_at: string | null;
   estimated_budget: number | null;
   expected_close_date: string | null;
+  // Verification + kanban (017)
+  email_verified: LeadEmailVerified;
+  linkedin_verified: boolean;
+  company_active: boolean | null;
+  pagespeed_score: number | null;
+  quality_score: number | null;
+  pipeline_stage: LeadPipelineStage;
+  verified_at: string | null;
+  // Stage tracking (020)
+  stage_updated_at: string;
 }
 
 export interface LeadAssignee {
@@ -416,9 +438,188 @@ export async function updateLead(
   return { success: true, data: data as LeadImport };
 }
 
+// ============================================================
+// Pipeline stage (017) — drag & drop kanban
+// ============================================================
+
+const VALID_PIPELINE_STAGES: LeadPipelineStage[] = [
+  "brut",
+  "verified",
+  "to_contact",
+  "contacted",
+  "in_discussion",
+];
+
+/**
+ * Mapping entre les colonnes du kanban et le `status` legacy.
+ * - Brut + Vérifié = `pending` (lead pas encore qualifié)
+ * - À contacter + Contacté + En discussion = `qualified` (lead jugé bon)
+ *
+ * Synchroniser les deux axes permet à la vue liste (filtre par status)
+ * et à la vue kanban (filtre par stage) de rester cohérentes.
+ */
+function stageToStatus(stage: LeadPipelineStage): "pending" | "qualified" {
+  return stage === "brut" || stage === "verified" ? "pending" : "qualified";
+}
+
+// ============================================================
+// Tâches auto liées au stage (020)
+// ============================================================
+//
+// Quand un lead change de stage, on crée auto une tâche pour ne rien
+// oublier. Avant de créer, on annule la tâche pending précédente
+// auto-créée pour ce lead (dédup via `tasks.auto_origin`).
+
+type StageTaskTemplate = {
+  title: (fullName: string) => string;
+  description: string;
+  priority: "normal" | "high" | "urgent";
+  /** Days from now */
+  due_in: number;
+};
+
+const STAGE_TASK_TEMPLATES: Partial<
+  Record<LeadPipelineStage, StageTaskTemplate>
+> = {
+  to_contact: {
+    title: (name) => `Appeler ${name}`,
+    description: "Premier contact — utilise le kit ✉️ généré si dispo.",
+    priority: "high",
+    due_in: 1,
+  },
+  contacted: {
+    title: (name) => `Relancer ${name}`,
+    description: "Vérifier la réponse au cold outreach.",
+    priority: "normal",
+    due_in: 5,
+  },
+  in_discussion: {
+    title: (name) => `Préparer proposition pour ${name}`,
+    description: "Le prospect a répondu — prépare l'offre.",
+    priority: "high",
+    due_in: 3,
+  },
+};
+
+function addDays(date: Date, days: number): string {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+/**
+ * Crée la tâche auto liée à un nouveau stage. Annule la précédente
+ * tâche auto pending pour ce lead (dédup propre).
+ * Non bloquant : si la création échoue, le drag du lead aboutit quand
+ * même (log côté serveur).
+ */
+async function createStageTask(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  lead: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    company_name: string | null;
+    assigned_to: string | null;
+  },
+  stage: LeadPipelineStage,
+  userId: string
+): Promise<void> {
+  const template = STAGE_TASK_TEMPLATES[stage];
+  if (!template) return; // brut / verified : pas de tâche
+
+  // 1) Annule les tâches auto pending précédentes pour ce lead
+  await supabase
+    .from("tasks")
+    .update({ status: "cancelled" })
+    .eq("related_type", "lead_import")
+    .eq("related_id", lead.id)
+    .like("auto_origin", "lead_stage:%")
+    .eq("status", "pending");
+
+  // 2) Crée la nouvelle tâche
+  const fullName =
+    [lead.first_name, lead.last_name].filter(Boolean).join(" ") ||
+    lead.company_name ||
+    "ce prospect";
+
+  const { error } = await supabase.from("tasks").insert({
+    title: template.title(fullName),
+    description: template.description,
+    status: "pending",
+    priority: template.priority,
+    due_date: addDays(new Date(), template.due_in),
+    related_type: "lead_import",
+    related_id: lead.id,
+    assigned_to: lead.assigned_to ?? userId,
+    auto_origin: `lead_stage:${stage}`,
+    created_by: userId,
+  });
+
+  if (error) {
+    console.error("[createStageTask] failed:", error.message);
+  }
+}
+
+/**
+ * Update the kanban stage of a lead. Used by drag & drop.
+ * Valid on leads in `pending` or `qualified` status — terminal statuses
+ * (converted/dismissed/duplicate) exit the kanban entirely.
+ *
+ * Auto-sync le `status` selon la colonne de destination pour garder
+ * la cohérence avec la vue liste.
+ */
+export async function updateLeadStage(
+  leadId: string,
+  stage: LeadPipelineStage
+): Promise<ActionResult> {
+  if (!VALID_PIPELINE_STAGES.includes(stage)) {
+    return { success: false, error: "Étape invalide." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const { data: lead } = await supabase
+    .from("lead_imports")
+    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { success: false, error: "Lead introuvable." };
+  if (lead.status !== "pending" && lead.status !== "qualified") {
+    return {
+      success: false,
+      error: "Ce lead a déjà été converti, rejeté ou marqué doublon.",
+    };
+  }
+
+  const newStatus = stageToStatus(stage);
+  const { error } = await supabase
+    .from("lead_imports")
+    .update({ pipeline_stage: stage, status: newStatus })
+    .eq("id", leadId);
+  if (error) return { success: false, error: error.message };
+
+  // Crée la tâche auto liée au nouveau stage (si applicable)
+  if (lead.pipeline_stage !== stage) {
+    await createStageTask(supabase, lead, stage, user.id);
+  }
+
+  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/taches");
+  return { success: true, data: null };
+}
+
 /**
  * Mark a lead as qualified — only valid from 'pending'.
  * No-op if the lead is already in another state.
+ *
+ * Auto-bascule aussi le `pipeline_stage` vers 'to_contact' si le lead
+ * est encore en 'brut' ou 'verified' (= pas encore positionné dans
+ * la partie "qualifiée" du kanban). Sinon, on garde le stage actuel.
  */
 export async function qualifyLead(leadId: string): Promise<ActionResult> {
   const supabase = await createClient();
@@ -429,7 +630,7 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("status")
+    .select("id, status, pipeline_stage, first_name, last_name, company_name, assigned_to")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -440,27 +641,153 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
     };
   }
 
+  const updates: { status: "qualified"; pipeline_stage?: LeadPipelineStage } = {
+    status: "qualified",
+  };
+  const stageChanged =
+    lead.pipeline_stage === "brut" || lead.pipeline_stage === "verified";
+  if (stageChanged) {
+    updates.pipeline_stage = "to_contact";
+  }
+
   const { error } = await supabase
     .from("lead_imports")
-    .update({ status: "qualified" })
+    .update(updates)
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
+  // Si on a basculé en 'to_contact', créer la tâche auto associée
+  if (stageChanged) {
+    await createStageTask(supabase, lead, "to_contact", user.id);
+  }
+
   revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/taches");
   return { success: true, data: null };
+}
+
+// ============================================================
+// Conversion fluide : lead → contact + company + deal en un clic (#4)
+// ============================================================
+
+/**
+ * Convertit un lead "en discussion" en pipeline complet : crée le
+ * contact + la company (via convertLead), puis crée un deal lié en
+ * stage `prospect`. Sert le bouton "→ Créer deal" depuis la card
+ * kanban quand le prospect a répondu.
+ */
+export async function convertLeadToDeal(
+  leadId: string,
+  overrides?: {
+    deal_title?: string;
+    deal_value?: number | null;
+    company_id?: string | null;
+    company_name?: string;
+    company_domain?: string;
+  }
+): Promise<
+  ActionResult<{ contact_id: string; company_id: string | null; deal_id: string }>
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  // 1) Lire les infos du lead pour défauts du deal
+  const { data: lead } = await supabase
+    .from("lead_imports")
+    .select("first_name, last_name, company_name, estimated_budget")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { success: false, error: "Lead introuvable." };
+
+  // 2) Convertir lead → contact + company (réutilise convertLead)
+  const conversionRes = await convertLead(leadId, {
+    company_id: overrides?.company_id ?? undefined,
+    company_name: overrides?.company_name,
+    company_domain: overrides?.company_domain,
+  });
+  if (!conversionRes.success) return conversionRes;
+
+  const { contact_id, company_id } = conversionRes.data;
+
+  // 3) Créer le deal lié
+  const fullName =
+    [lead.first_name, lead.last_name].filter(Boolean).join(" ") ||
+    lead.company_name ||
+    "Nouveau prospect";
+  const dealTitle =
+    overrides?.deal_title?.trim() ||
+    (lead.company_name ? lead.company_name : fullName);
+  const dealValue =
+    overrides?.deal_value !== undefined
+      ? overrides.deal_value
+      : lead.estimated_budget ?? null;
+
+  const { data: deal, error: dealErr } = await supabase
+    .from("deals")
+    .insert({
+      title: dealTitle,
+      stage: "prospect",
+      contact_id,
+      company_id,
+      value: dealValue,
+      assigned_to: user.id,
+      created_by: user.id,
+      source_lead_id: leadId,
+    })
+    .select("id")
+    .single();
+
+  if (dealErr || !deal) {
+    return {
+      success: false,
+      error: dealErr?.message ?? "Impossible de créer le deal.",
+    };
+  }
+
+  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
+  revalidatePath("/dashboard/contacts");
+
+  return {
+    success: true,
+    data: { contact_id, company_id, deal_id: deal.id },
+  };
+}
+
+/**
+ * Cherche le deal créé depuis ce lead (via convertLeadToDeal).
+ * Retourne null si aucun deal n'a été créé via cette source.
+ */
+export async function getLeadAssociatedDeal(
+  leadId: string
+): Promise<{ id: string; title: string; stage: string } | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("deals")
+    .select("id, title, stage")
+    .eq("source_lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data ?? null;
 }
 
 /**
  * Fetches everything needed to render the LeadDrawer details panel:
- * activities timeline, custom fields with values, attached tags.
+ * activities timeline, custom fields with values, attached tags,
+ * et le deal associé si le lead a été converti.
  */
 export async function getLeadDetails(leadId: string) {
-  const [activities, customFields, tags] = await Promise.all([
+  const [activities, customFields, tags, associatedDeal] = await Promise.all([
     getActivitiesForEntity("lead_import", leadId),
     getFieldsWithValues("lead_import", leadId),
     getTagsForEntity("lead_import", leadId),
+    getLeadAssociatedDeal(leadId),
   ]);
-  return { activities, customFields, tags };
+  return { activities, customFields, tags, associatedDeal };
 }
 
 /**

@@ -25,7 +25,7 @@ export type ActionResult<T = null> =
   | { success: false; error: string };
 
 const DEAL_SELECT =
-  "*, contact:contacts(id, first_name, last_name), company:companies(id, name), assignee:profiles!deals_assigned_to_fkey(id, full_name, email, avatar_url, role, created_at, updated_at)";
+  "*, contact:contacts(id, first_name, last_name), company:companies(id, name), assignee:profiles!deals_assigned_to_fkey(id, full_name, email, avatar_url, role, created_at, updated_at), source_lead:lead_imports!deals_source_lead_id_fkey(id, first_name, last_name, company_name)";
 
 const VALID_STAGES: DealStage[] = [
   "prospect",

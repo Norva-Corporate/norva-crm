@@ -177,3 +177,36 @@ export async function deleteTask(id: string): Promise<ActionResult> {
   revalidateTasks();
   return { success: true, data: null };
 }
+
+// ============================================================
+// Tâches d'un projet (pour la fiche projet)
+// ============================================================
+export interface ProjectTaskRow {
+  id: string;
+  title: string;
+  description: string | null;
+  status: import("@/types").TaskStatus;
+  priority: import("@/types").TaskPriority;
+  due_date: string | null;
+  assigned_to: string | null;
+  assignee: { id: string; full_name: string | null } | null;
+  auto_origin: string | null;
+  created_at: string;
+}
+
+export async function getTasksForProject(
+  projectId: string
+): Promise<ProjectTaskRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tasks")
+    .select(
+      "id, title, description, status, priority, due_date, assigned_to, auto_origin, created_at, assignee:profiles!tasks_assigned_to_fkey(id, full_name)"
+    )
+    .eq("related_type", "project")
+    .eq("related_id", projectId)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+
+  return (data ?? []) as unknown as ProjectTaskRow[];
+}

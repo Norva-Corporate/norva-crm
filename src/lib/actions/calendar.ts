@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getProjectColor, withProjectPrefix } from "@/lib/project-color";
 
 export type CalendarEventKind =
   | "deal"
@@ -17,6 +18,9 @@ export interface CalendarEvent {
   color: string;
   href: string;
   meta?: string | null;
+  /** Pour les tâches liées à un projet : permet le filtre par projet et le styling */
+  projectId?: string | null;
+  projectName?: string | null;
 }
 
 export async function getCalendarEvents(
@@ -40,7 +44,7 @@ export async function getCalendarEvents(
       ),
     supabase
       .from("tasks")
-      .select("id, title, status, priority, due_date")
+      .select("id, title, status, priority, due_date, related_type, related_id")
       .not("due_date", "is", null)
       .gte("due_date", fromISO)
       .lte("due_date", toISO),
@@ -52,6 +56,25 @@ export async function getCalendarEvents(
       .gte("due_date", fromISO)
       .lte("due_date", toISO),
   ]);
+
+  // Pour les tâches liées à un projet : résoudre les noms projets en 1 query
+  const taskProjectIds = Array.from(
+    new Set(
+      (tasks.data ?? [])
+        .filter((t) => t.related_type === "project" && t.related_id)
+        .map((t) => t.related_id as string)
+    )
+  );
+  const projectNamesByTaskRel = new Map<string, string>();
+  if (taskProjectIds.length > 0) {
+    const { data: projRows } = await supabase
+      .from("projects")
+      .select("id, name")
+      .in("id", taskProjectIds);
+    for (const p of projRows ?? []) {
+      projectNamesByTaskRel.set(p.id, p.name);
+    }
+  }
 
   const STAGE_COLOR: Record<string, string> = {
     prospect: "#6366F1",
@@ -117,14 +140,35 @@ export async function getCalendarEvents(
   for (const t of tasks.data ?? []) {
     if (!t.due_date) continue;
     if (t.status === "cancelled") continue;
+    // Une tâche liée à un projet est "vivante" si on a pu résoudre son nom.
+    // Sinon le projet a été supprimé → on traite la tâche comme orpheline
+    // (sans couleur projet, sans préfixe, lien vers la page tâches).
+    const projectName =
+      t.related_type === "project" && t.related_id
+        ? projectNamesByTaskRel.get(t.related_id as string) ?? null
+        : null;
+    const projectIsAlive = !!projectName;
+    const projectId = projectIsAlive ? (t.related_id as string) : null;
+    const color = projectIsAlive
+      ? getProjectColor(projectId as string)
+      : PRIO_COLOR[t.priority] ?? "#3B7BF5";
+    const metaParts: string[] = [];
+    if (t.status === "done") metaParts.push("Terminée");
+    if (t.priority === "high" || t.priority === "urgent") {
+      metaParts.push(t.priority === "urgent" ? "Urgent" : "Priorité haute");
+    }
     events.push({
       id: `task-${t.id}`,
       kind: "task",
-      label: t.title,
+      label: withProjectPrefix(t.title, projectName),
       date: t.due_date,
-      color: PRIO_COLOR[t.priority] ?? "#3B7BF5",
-      href: "/dashboard/taches",
-      meta: t.status === "done" ? "Terminée" : null,
+      color,
+      href: projectIsAlive
+        ? `/dashboard/projets/${projectId}`
+        : "/dashboard/taches",
+      meta: metaParts.length > 0 ? metaParts.join(" · ") : null,
+      projectId,
+      projectName,
     });
   }
 

@@ -60,6 +60,7 @@ interface FormState {
   start_date: string;
   end_date: string;
   budget: string;
+  duration_days: string;
   assigned_to: string;
 }
 
@@ -73,6 +74,7 @@ const empty: FormState = {
   start_date: "",
   end_date: "",
   budget: "",
+  duration_days: "14",
   assigned_to: "",
 };
 
@@ -107,6 +109,8 @@ export function ProjectDrawer({
           start_date: project.start_date ?? "",
           end_date: project.end_date ?? "",
           budget: project.budget != null ? String(project.budget) : "",
+          duration_days:
+            project.duration_days != null ? String(project.duration_days) : "14",
           assigned_to: project.assigned_to ?? "",
         });
       } else {
@@ -124,6 +128,9 @@ export function ProjectDrawer({
     e.preventDefault();
     setError(null);
 
+    const parsedDuration = form.duration_days
+      ? parseInt(form.duration_days, 10)
+      : 14;
     const payload: ProjectInput = {
       name: form.name,
       description: form.description || null,
@@ -134,6 +141,10 @@ export function ProjectDrawer({
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       budget: form.budget ? parseFloat(form.budget) : null,
+      duration_days:
+        Number.isFinite(parsedDuration) && parsedDuration > 0
+          ? parsedDuration
+          : 14,
       assigned_to: form.assigned_to || null,
     };
 
@@ -193,7 +204,7 @@ export function ProjectDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Statut</Label>
                   <Select
@@ -224,6 +235,19 @@ export function ProjectDrawer({
                     value={form.budget}
                     onChange={field("budget")}
                     placeholder="10000"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Durée (jours)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="180"
+                    step="1"
+                    value={form.duration_days}
+                    onChange={field("duration_days")}
+                    placeholder="14"
+                    title="Durée prévue du delivery — module les délais des tâches auto (1-180j, par défaut 14)"
                   />
                 </div>
               </div>

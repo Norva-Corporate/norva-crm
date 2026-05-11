@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -51,6 +51,7 @@ function todayISO() {
 
 export function CalendarClient({ year, month, events }: Props) {
   const router = useRouter();
+  const [projectFilter, setProjectFilter] = useState<string>("all");
 
   // Build the 6×7 grid (Monday-first)
   const days = useMemo(() => {
@@ -71,15 +72,40 @@ export function CalendarClient({ year, month, events }: Props) {
     return list;
   }, [year, month]);
 
+  // Liste des projets visibles ce mois (extraits depuis les events tâches projet)
+  const availableProjects = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of events) {
+      if (e.projectId && e.projectName) m.set(e.projectId, e.projectName);
+    }
+    return Array.from(m.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [events]);
+
+  // Apply filter
+  const filteredEvents = useMemo(() => {
+    if (projectFilter === "all") return events;
+    return events.filter((e) => {
+      // Filtre actif : on garde les events liés au projet sélectionné
+      if (e.projectId === projectFilter) return true;
+      // project_start / project_end utilisent un id préfixé "project-start-<id>" → on matche
+      if (e.kind === "project_start" || e.kind === "project_end") {
+        return e.id.endsWith(`-${projectFilter}`);
+      }
+      return false;
+    });
+  }, [events, projectFilter]);
+
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    for (const e of events) {
+    for (const e of filteredEvents) {
       const arr = map.get(e.date) ?? [];
       arr.push(e);
       map.set(e.date, arr);
     }
     return map;
-  }, [events]);
+  }, [filteredEvents]);
 
   const today = todayISO();
 
@@ -95,12 +121,12 @@ export function CalendarClient({ year, month, events }: Props) {
     router.push(`/dashboard/calendrier?month=${param}`);
   }
 
-  const totalEvents = events.length;
+  const totalEvents = filteredEvents.length;
   const kindCounts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const e of events) c[e.kind] = (c[e.kind] ?? 0) + 1;
+    for (const e of filteredEvents) c[e.kind] = (c[e.kind] ?? 0) + 1;
     return c;
-  }, [events]);
+  }, [filteredEvents]);
 
   return (
     <>
@@ -137,6 +163,23 @@ export function CalendarClient({ year, month, events }: Props) {
           <h2 className="text-base font-semibold text-foreground">
             {MONTH_LABELS[month]} {year}
           </h2>
+
+          {/* Filtre par projet */}
+          {availableProjects.length > 0 && (
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="h-7 px-2 text-xs bg-[var(--surface)] border border-[var(--border)] text-foreground focus:outline-none focus:border-accent/40"
+            >
+              <option value="all">Tous les projets</option>
+              {availableProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="ml-auto text-xs text-muted-foreground">
             {totalEvents} évènement{totalEvents > 1 ? "s" : ""}
             {Object.entries(kindCounts).length > 0 && " · "}

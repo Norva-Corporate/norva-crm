@@ -18,6 +18,7 @@ export interface ProjectInput {
   start_date?: string | null;
   end_date?: string | null;
   budget?: number | null;
+  duration_days?: number;
   assigned_to?: string | null;
 }
 
@@ -46,6 +47,12 @@ function nullify<T extends Record<string, unknown>>(obj: T): T {
     out[k] = (v === "" || v === undefined ? null : v) as T[Extract<keyof T, string>];
   }
   return out;
+}
+
+/** Clamp durée projet : 1-180 jours, default 14. */
+function clampDuration(d: number | undefined): number {
+  if (d == null || !Number.isFinite(d)) return 14;
+  return Math.min(180, Math.max(1, Math.round(d)));
 }
 
 function revalidateProjects(id?: string) {
@@ -88,9 +95,10 @@ export async function createProject(
     assigned_to: data.assigned_to,
   });
 
+  const duration = clampDuration(data.duration_days);
   const { data: inserted, error } = await supabase
     .from("projects")
-    .insert({ ...payload, created_by: user.id })
+    .insert({ ...payload, created_by: user.id, duration_days: duration })
     .select("id")
     .single();
 
@@ -122,7 +130,7 @@ export async function updateProject(
     return { success: false, error: "Statut invalide." };
   }
 
-  const payload = nullify({
+  const payload: Record<string, unknown> = nullify({
     name: data.name.trim(),
     description: data.description,
     status: data.status,
@@ -134,6 +142,9 @@ export async function updateProject(
     budget: data.budget ?? null,
     assigned_to: data.assigned_to,
   });
+  if (data.duration_days !== undefined) {
+    payload.duration_days = clampDuration(data.duration_days);
+  }
 
   const { error } = await supabase.from("projects").update(payload).eq("id", id);
 
@@ -200,6 +211,7 @@ export type ProjectPatch = Partial<{
   start_date: string | null;
   end_date: string | null;
   budget: number | null;
+  duration_days: number;
   assigned_to: string | null;
 }>;
 
@@ -222,6 +234,8 @@ export async function patchProject(
     const v = patch[k];
     if (k === "name") {
       payload[k] = (v as string).trim();
+    } else if (k === "duration_days") {
+      payload[k] = clampDuration(v as number);
     } else {
       payload[k] = v === "" ? null : v;
     }

@@ -56,8 +56,11 @@ le fait via Norva).
 
 - `mcp__supabase__execute_sql`
 - `Bash` + `WebFetch`
-- Variables d'env : `GOOGLE_MAPS_API_KEY` (optionnel),
-  `HUNTER_API_KEY` (optionnel)
+- Variables d'env :
+  - `GOOGLE_MAPS_API_KEY` (optionnel)
+  - `HUNTER_API_KEY` (optionnel) — email verification
+  - `MAILBOXLAYER_API_KEY` (optionnel) — backup email verification
+  - `GOOGLE_PAGESPEED_KEY` (optionnel) — augmente quota PageSpeed
 
 ## Skills attachées
 
@@ -67,7 +70,10 @@ le fait via Norva).
 | `norva-leads-enrich` | UPDATE patterns sécurisés |
 | `prospection-enrichment-gouv` | API gouv FR (dirigeant, SIRET, NAF) |
 | `prospection-email-discovery` | Deep search email pro |
-| `prospection-site-audit` | Audit du site si présent |
+| `prospection-email-verification` | Vérifier deliverability email |
+| `prospection-bodacc-check` | Entreprise active (radiation/procédure) |
+| `prospection-site-audit` | Audit qualitatif du site si présent |
+| `prospection-pagespeed-check` | Score perf site mobile |
 | `norva-supabase-insert` | INSERT activity de trace (sauf pour leads) |
 
 ## Workflow MODE QUEUE (par défaut)
@@ -95,24 +101,50 @@ le fait via Norva).
    3. Applique les skills d'enrichissement disponibles selon le besoin :
       - `prospection-enrichment-gouv` si dirigeant/SIRET/effectif manque
       - `prospection-email-discovery` si email pro manque
-      - `prospection-site-audit` si site existe mais pas auditré
-   4. UPDATE en COALESCE — exemple pour `lead_imports` :
+      - **`prospection-email-verification`** si email présent ET
+        (`email_verified='unverified'` OU `verified_at` > 60 jours) →
+        chaîne MX → Hunter free → Mailboxlayer free → SMTP probe
+      - **`prospection-bodacc-check`** si SIREN connu ET
+        (`company_active IS NULL` OU `verified_at` > 30 jours) →
+        détecte radiation, liquidation, changement de gérant
+      - `prospection-site-audit` si site existe mais pas audité
+      - **`prospection-pagespeed-check`** si site existe ET
+        (`pagespeed_score IS NULL` OU `verified_at` > 60 jours)
+   4. **Recalcule `quality_score`** (0-100) selon la grille du
+      Lead Intake :
+      - `email_verified='valid'` : +30, `'risky'` : +15
+      - `linkedin_verified=true` : +20
+      - `company_active=true` : +20
+      - dirigeant identifié (first+last_name) : +15
+      - téléphone présent : +10
+      - site audité (PageSpeed ou site_audit) : +5
+   5. UPDATE — COALESCE pour les identités (jamais écraser),
+      écriture directe pour les colonnes de vérif (recalculées) :
       ```sql
       UPDATE public.lead_imports
       SET first_name = COALESCE(first_name, '<prénom trouvé ou NULL>'),
           last_name  = COALESCE(last_name,  '<nom trouvé ou NULL>'),
-          email      = COALESCE(email,      '<email pro ou NULL>'),
+          email      = COALESCE(email,      '<email ou NULL>'),
           phone      = COALESCE(phone,      '<phone ou NULL>'),
           role       = COALESCE(role,       '<rôle ou NULL>'),
           company_domain = COALESCE(company_domain, '<domaine ou NULL>'),
+          email_verified    = '<valid|risky|invalid|unverified>',
+          linkedin_verified = <true|false>,
+          company_active    = <true|false|NULL>,
+          pagespeed_score   = <score ou NULL>,
+          quality_score     = <0-100>,
+          verified_at       = now(),
           raw_payload = raw_payload || '<json delta>'::jsonb
       WHERE id = '<task.entity_id>';
       ```
-   5. **Si entité ≠ `lead_import`** : INSERT activity de trace
+      ⚠️ **Ne JAMAIS toucher à `pipeline_stage`** — c'est l'utilisateur
+      qui le contrôle via le kanban (drag & drop). L'agent enrichit
+      les données ; le user décide quand le lead avance dans le funnel.
+   6. **Si entité ≠ `lead_import`** : INSERT activity de trace
       (`type='note'`, body="Enrichi automatiquement",
       `payload.fields_updated=[...]`)
-   6. UPDATE task `done`, result =
-      `{ fields_updated: ["first_name", "email", "siret"], entity_id: "<task.entity_id>" }`
+   7. UPDATE task `done`, result =
+      `{ fields_updated: ["first_name", "email", "siret", "email_verified", "company_active"], entity_id: "<task.entity_id>" }`
 
 ## Workflow MODE BATCH (uniquement si demande explicite)
 
@@ -139,6 +171,12 @@ JAMAIS de batch.
 - ✅ Si rien à enrichir (toutes les colonnes sont déjà remplies) →
   UPDATE task `done` avec `result={fields_updated: []}` et message
   "Rien à enrichir, fiche déjà complète"
+- ✅ **UTF-8 propre** : écris les accents en français correct (é, è,
+  ê, à, â, ç, î, ï, ô, ù, û, œ, æ). **Jamais** de placeholder
+  corrompu (`�` = U+FFFD). Si un caractère pose problème, écris le
+  mot sans accent (ex `Gerant` plutôt que `G�rant`). Un trigger
+  Postgres nettoie automatiquement les `�` à l'UPDATE, mais autant
+  éviter à la source.
 
 ## Format de réponse final
 

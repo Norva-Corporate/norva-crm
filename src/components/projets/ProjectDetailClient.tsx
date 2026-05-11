@@ -11,19 +11,31 @@ import {
   Building2,
   TrendingUp,
   FileText,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Flame,
+  AlertCircle,
+  ListChecks,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
+import { TaskDrawer } from "@/components/tasks/TaskDrawer";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { InlineText } from "@/components/ui/inline-text";
 import { InlinePicker } from "@/components/ui/inline-picker";
 import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { patchProject, type ProjectPatch } from "@/lib/actions/projects";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import {
+  updateTaskStatus,
+  type ProjectTaskRow,
+} from "@/lib/actions/tasks";
+import { getProjectColor } from "@/lib/project-color";
+import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type {
   Activity,
   CustomFieldWithValue,
@@ -32,6 +44,9 @@ import type {
   InvoiceStatus,
   DocumentType,
   Tag,
+  Task,
+  TaskPriority,
+  TaskStatus,
 } from "@/types";
 
 const STATUS_CONFIG: Record<
@@ -85,7 +100,7 @@ type ProjectDetail = Project & {
 interface Props {
   project: ProjectDetail;
   deals: { id: string; title: string }[];
-  profiles: { id: string; full_name: string | null }[];
+  profiles: { id: string; full_name: string | null; email?: string | null }[];
   projects: { id: string; name: string }[];
   contacts: { id: string; first_name: string; last_name: string }[];
   companies: { id: string; name: string }[];
@@ -98,6 +113,7 @@ interface Props {
   })[];
   tags?: Tag[];
   customFields?: CustomFieldWithValue[];
+  tasks?: ProjectTaskRow[];
 }
 
 export function ProjectDetailClient({
@@ -110,11 +126,16 @@ export function ProjectDetailClient({
   activities = [],
   tags = [],
   customFields = [],
+  tasks = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [, startTransition] = useTransition();
+
+  const projectColor = getProjectColor(project.id);
 
   const sc = STATUS_CONFIG[project.status];
 
@@ -141,6 +162,38 @@ export function ProjectDetailClient({
 
   function handleSuccess() {
     startTransition(() => router.refresh());
+  }
+
+  function toggleTaskDone(t: ProjectTaskRow) {
+    const next: TaskStatus = t.status === "done" ? "pending" : "done";
+    startTransition(async () => {
+      await updateTaskStatus(t.id, next);
+      router.refresh();
+    });
+  }
+
+  function openTaskCreate() {
+    setEditingTask(null);
+    setTaskOpen(true);
+  }
+
+  function openTaskEdit(t: ProjectTaskRow) {
+    // Reconstruit un Task minimal pour le drawer
+    setEditingTask({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      status: t.status,
+      priority: t.priority,
+      due_date: t.due_date,
+      related_type: "project",
+      related_id: project.id,
+      assigned_to: t.assigned_to,
+      created_by: "",
+      created_at: t.created_at,
+      updated_at: t.created_at,
+    });
+    setTaskOpen(true);
   }
 
   const patch =
@@ -460,6 +513,44 @@ export function ProjectDetailClient({
           />
         </Card>
 
+        {/* Tâches du projet */}
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs uppercase tracking-wide text-muted-foreground inline-flex items-center gap-2">
+              <span
+                className="h-2 w-2 rounded-full inline-block"
+                style={{ background: projectColor }}
+                aria-hidden
+              />
+              <ListChecks className="h-3 w-3" />
+              Tâches du projet ({tasks.filter((t) => t.status !== "cancelled").length})
+            </h2>
+            <Button size="sm" variant="outline" onClick={openTaskCreate}>
+              <Plus className="h-3.5 w-3.5" />
+              Nouvelle tâche
+            </Button>
+          </div>
+
+          {tasks.filter((t) => t.status !== "cancelled").length === 0 ? (
+            <p className="text-xs text-muted-foreground py-6 text-center">
+              Aucune tâche pour ce projet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[var(--border)]">
+              {tasks
+                .filter((t) => t.status !== "cancelled")
+                .map((t) => (
+                  <TaskItem
+                    key={t.id}
+                    task={t}
+                    onToggle={toggleTaskDone}
+                    onEdit={openTaskEdit}
+                  />
+                ))}
+            </ul>
+          )}
+        </Card>
+
         {/* Invoices */}
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -594,7 +685,110 @@ export function ProjectDetailClient({
         defaultProjectId={project.id}
         onSuccess={handleSuccess}
       />
+
+      <TaskDrawer
+        open={taskOpen}
+        onOpenChange={setTaskOpen}
+        task={editingTask}
+        defaultRelated={{ type: "project", id: project.id }}
+        members={profiles.map((p) => ({
+          id: p.id,
+          full_name: p.full_name,
+          email: p.email ?? null,
+        }))}
+        onSuccess={handleSuccess}
+      />
     </>
+  );
+}
+
+// ============================================================
+// Sub-component : ligne de tâche (compact)
+// ============================================================
+const TASK_PRIO_META: Record<
+  TaskPriority,
+  { label: string; color: string; Icon: React.ComponentType<{ className?: string }> | null }
+> = {
+  low: { label: "Basse", color: "text-muted-foreground", Icon: null },
+  normal: { label: "Normale", color: "text-foreground", Icon: null },
+  high: { label: "Haute", color: "text-[#FB923C]", Icon: AlertCircle },
+  urgent: { label: "Urgente", color: "text-destructive", Icon: Flame },
+};
+
+function TaskItem({
+  task,
+  onToggle,
+  onEdit,
+}: {
+  task: ProjectTaskRow;
+  onToggle: (t: ProjectTaskRow) => void;
+  onEdit: (t: ProjectTaskRow) => void;
+}) {
+  const done = task.status === "done";
+  const overdue =
+    !!task.due_date &&
+    task.due_date < new Date().toISOString().slice(0, 10) &&
+    !done;
+  const prio = TASK_PRIO_META[task.priority];
+
+  return (
+    <li className="flex items-start gap-3 py-2.5">
+      <button
+        onClick={() => onToggle(task)}
+        className="mt-0.5 shrink-0"
+        aria-label={done ? "Rouvrir" : "Marquer terminée"}
+      >
+        {done ? (
+          <CheckCircle2 className="h-4 w-4 text-success" />
+        ) : (
+          <Circle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onEdit(task)}
+        className="flex-1 min-w-0 text-left"
+      >
+        <p
+          className={cn(
+            "text-sm font-medium text-foreground hover:text-accent transition-colors",
+            done && "line-through text-muted-foreground"
+          )}
+        >
+          {task.title}
+        </p>
+        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+          {task.due_date && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[11px]",
+                overdue ? "text-destructive" : "text-muted-foreground"
+              )}
+            >
+              <Clock className="h-3 w-3" />
+              {formatDate(task.due_date)}
+            </span>
+          )}
+          {task.priority !== "normal" && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 text-[11px]",
+                prio.color
+              )}
+            >
+              {prio.Icon && <prio.Icon className="h-3 w-3" />}
+              {prio.label}
+            </span>
+          )}
+          {task.assignee?.full_name && (
+            <span className="text-[11px] text-muted-foreground">
+              👤 {task.assignee.full_name}
+            </span>
+          )}
+        </div>
+      </button>
+    </li>
   );
 }
 

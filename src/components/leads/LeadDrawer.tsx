@@ -26,6 +26,7 @@ import { InlinePicker } from "@/components/ui/inline-picker";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
+import Link from "next/link";
 import {
   Loader2,
   Sparkles,
@@ -33,6 +34,8 @@ import {
   Star,
   X,
   Loader,
+  Trophy,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -95,6 +98,11 @@ export function LeadDrawer({
     CustomFieldWithValue[] | null
   >(null);
   const [tags, setTags] = useState<Tag[] | null>(null);
+  const [associatedDeal, setAssociatedDeal] = useState<{
+    id: string;
+    title: string;
+    stage: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!lead) return;
@@ -116,12 +124,14 @@ export function LeadDrawer({
     setActivities(null);
     setCustomFields(null);
     setTags(null);
+    setAssociatedDeal(null);
     let cancelled = false;
     getLeadDetails(lead.id).then((d) => {
       if (cancelled) return;
       setActivities(d.activities as unknown as Activity[]);
       setCustomFields(d.customFields);
       setTags(d.tags);
+      setAssociatedDeal(d.associatedDeal);
     });
     return () => {
       cancelled = true;
@@ -308,6 +318,28 @@ export function LeadDrawer({
           </DrawerBody>
         ) : (
           <DrawerBody className="space-y-5">
+            {/* Deal associé — visible si le lead a été converti */}
+            {associatedDeal && (
+              <div className="flex items-start gap-2 px-2.5 py-2 bg-[#22C55E]/5 border border-[#22C55E]/30 text-xs">
+                <Trophy className="h-3.5 w-3.5 text-[#22C55E] shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-0.5">
+                    Deal créé depuis ce lead
+                  </p>
+                  <p className="text-foreground truncate">
+                    {associatedDeal.title}
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/pipeline"
+                  className="text-[#22C55E] hover:underline inline-flex items-center gap-1 shrink-0"
+                >
+                  Pipeline
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
+
             <Section title="Identité">
               <FieldRow label="Prénom *">
                 <InlineText

@@ -6,40 +6,49 @@ et leur statut.
 
 ## ✅ Agents en place (5)
 
-### 1. Agent Prospection 🔍
+### 1. Agent Lead Intake 🎯 *(remplace Prospection + Enrichissement batch)*
 
-**Fonction** : Découvre de nouveaux prospects (artisans, TPE, PME, ETI,
-commerces locaux, petites startups FR) selon des critères de ciblage
-donnés, les qualifie sur 4 axes équipondérés (Fit/Pain/Reach/Budget,
-25 % chacun) et les insère dans `lead_imports`. Seuil de SKIP à 0.30.
+**Fonction** : Agent unifié de prospection + vérification. Découvre
+de nouveaux prospects (TPE/artisans/commerces/professions libérales
+0-49 salariés), les enrichit (dirigeant, SIRET, effectif), **vérifie
+toutes les données** (email deliverable, LinkedIn match, BODACC entreprise
+active, perf site PageSpeed), score sur 4 axes recalibrés TPE, et insère
+dans `lead_imports` avec `pipeline_stage='verified'` directement. **UNE
+seule passe, leads "verts" prêts à examiner.**
 
 - **Trigger** : Manuel dans multica, prompt avec critère
-  *(ex. "5 coiffeurs sans site à Lyon" ou "10 PME industrielles
-  20-200 salariés en Auvergne-Rhône-Alpes")*
+  *(ex. "5 coiffeurs sans site à Lyon 6e", "10 plombiers sur Lille")*
 - **Sources** : Google Places API, API gouv FR (recherche-entreprises),
-  mentions légales des sites, **LinkedIn (Sales Navigator + scraping
-  de profils publics)**, **scraping web libre** (Pages Jaunes,
-  Societe.com, Pappers complet, annuaires métiers), Hunter.io
-  (optionnel)
-- **Sortie** : INSERT `lead_imports` avec `source='multica-prospection'`
-- **Volume** : 5-20 prospects par run
-- **Skills** : google-places, enrichment-gouv, site-audit,
-  email-discovery, scoring, supabase-insert
-- **Prompt** : `docs/agents/prospection-prompt.md`
+  BODACC opendatasoft (radiation/liquidation), Google PageSpeed Insights,
+  Hunter.io free, Mailboxlayer free, DNS MX, LinkedIn (Google search
+  + scraping public), mentions légales, Pages Jaunes, Pappers
+- **Sortie** : INSERT `lead_imports` avec `source='multica-lead-intake'`,
+  `pipeline_stage='verified'`, `quality_score`, `email_verified`,
+  `linkedin_verified`, `company_active`, `pagespeed_score` tous remplis
+- **Volume** : 5-15 prospects par run (qualité > quantité)
+- **Skills** : google-places, enrichment-gouv, bodacc-check,
+  site-audit, pagespeed-check, email-discovery, email-verification,
+  scoring (TPE recalibré), supabase-insert
+- **Prompt** : `docs/agents/lead-intake-prompt.md`
 
-### 2. Agent Enrichissement 🪄
+### 2. Agent Enrichissement 🪄 *(mode queue seulement — refresh legacy)*
 
-**Fonction** : Complète les leads/contacts/companies incomplets en
-récupérant via les sources publiques gratuites les champs manquants
-(dirigeant, email pro, SIRET, secteur, taille).
+**Fonction** : Re-enrichit un lead/contact/company existant à la demande
+de l'utilisateur (bouton 🪄). Sert pour les leads importés AVANT le
+nouveau pipeline Lead Intake, ou pour rafraîchir des données vieilles
+(> 60 jours).
 
-- **Trigger** : Bouton 🪄 sur ligne lead pending dans
-  `/dashboard/leads`, ou manuel
+**Pour les nouveaux prospects, utiliser Lead Intake à la place** —
+Enrichissement ne fait plus de batch de découverte.
+
+- **Trigger** : Bouton 🪄 sur ligne lead dans `/dashboard/leads`,
+  ou manuel queue-driven
 - **Sources** : API gouv FR, mentions légales, Pages Jaunes, Hunter.io
 - **Sortie** : UPDATE in-place sur `lead_imports`/`contacts`/`companies`
   + INSERT activity de trace (sauf pour leads)
 - **Skills** : leads-enrich, enrichment-gouv, email-discovery,
-  site-audit, supabase-insert, agent-queue
+  email-verification, bodacc-check, site-audit, pagespeed-check,
+  supabase-insert, agent-queue
 - **Prompt** : `docs/agents/enrichissement-prompt.md`
 
 ### 3. Agent Premier Contact ✉️
@@ -181,7 +190,7 @@ Chaque agent doit utiliser un identifiant unique pour le champ
 
 | Agent | Source |
 |-------|--------|
-| Prospection | `multica-prospection` |
+| Lead Intake | `multica-lead-intake` |
 | Enrichissement | n/a (UPDATE en place) |
 | Premier Contact | n/a (INSERT activities) |
 | Audit Site | n/a (INSERT activity) |

@@ -62,9 +62,18 @@ export interface Deal {
   assigned_to: string | null;
   assignee?: Profile;
   notes: string | null;
+  /** Lead d'origine si le deal a été créé via convertLeadToDeal (022) */
+  source_lead_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface DealSourceLead {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
 }
 
 export type ProjectStatus =
@@ -88,6 +97,8 @@ export interface Project {
   start_date: string | null;
   end_date: string | null;
   budget: number | null;
+  /** Durée prévue du delivery en jours (1-180, default 14). Module les délais des tâches auto (023). */
+  duration_days: number;
   assigned_to: string | null;
   assignee?: Profile;
   created_by: string;
@@ -152,6 +163,8 @@ export interface DealWithRelations {
   assigned_to: string | null;
   assignee: Profile | null;
   notes: string | null;
+  source_lead_id: string | null;
+  source_lead: DealSourceLead | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -186,7 +199,12 @@ export interface CompanyWithRelations extends Company {
 // ============================================================
 export type TaskStatus = "pending" | "in_progress" | "done" | "cancelled";
 export type TaskPriority = "low" | "normal" | "high" | "urgent";
-export type TaskRelatedType = "contact" | "company" | "deal" | "project";
+export type TaskRelatedType =
+  | "contact"
+  | "company"
+  | "deal"
+  | "project"
+  | "lead_import";
 
 export interface Task {
   id: string;

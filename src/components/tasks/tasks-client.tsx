@@ -27,6 +27,7 @@ import {
 import { TaskDrawer } from "@/components/tasks/TaskDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteTask, updateTaskStatus } from "@/lib/actions/tasks";
+import { getProjectColor } from "@/lib/project-color";
 import { formatDate, cn } from "@/lib/utils";
 import type { Task, TaskPriority, TaskStatus } from "@/types";
 
@@ -73,6 +74,7 @@ const STATUS_FILTERS: { key: "all" | TaskStatus; label: string }[] = [
 
 type TaskRow = Task & {
   assignee?: { id: string; full_name: string | null } | null;
+  relatedProject?: { id: string; name: string } | null;
 };
 
 interface Props {
@@ -100,6 +102,7 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
     "all"
   );
   const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>("all");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<TaskRow | null>(null);
@@ -107,6 +110,17 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
 
   const today = startOfTodayISO();
   const weekEnd = endOfWeekISO();
+
+  // Liste des projets visibles parmi les tâches (pour le dropdown filtre)
+  const availableProjects = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of initialTasks) {
+      if (t.relatedProject) m.set(t.relatedProject.id, t.relatedProject.name);
+    }
+    return Array.from(m.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [initialTasks]);
 
   const stats = useMemo(() => {
     const open = initialTasks.filter(
@@ -133,6 +147,11 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
       const matchesStatus =
         statusFilter === "all" || t.status === statusFilter;
 
+      const matchesProject =
+        projectFilter === "all" ||
+        (projectFilter === "none" && !t.relatedProject) ||
+        t.relatedProject?.id === projectFilter;
+
       let matchesView = true;
       if (view === "mine") {
         matchesView = t.assigned_to === currentUserId;
@@ -147,12 +166,13 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
           !!t.due_date && t.due_date >= today && t.due_date <= weekEnd;
       }
 
-      return matchesSearch && matchesStatus && matchesView;
+      return matchesSearch && matchesStatus && matchesProject && matchesView;
     });
   }, [
     initialTasks,
     search,
     statusFilter,
+    projectFilter,
     view,
     today,
     weekEnd,
@@ -246,6 +266,21 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
               </button>
             ))}
           </div>
+          {availableProjects.length > 0 && (
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="h-7 px-2 text-xs bg-[var(--surface)] border border-[var(--border)] text-foreground focus:outline-none focus:border-accent/40"
+            >
+              <option value="all">Tous les projets</option>
+              <option value="none">Sans projet</option>
+              {availableProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* List */}
@@ -294,14 +329,37 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3">
-                        <p
-                          className={cn(
-                            "text-sm font-medium text-foreground",
-                            done && "line-through text-muted-foreground"
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
+                          {t.relatedProject && (
+                            <span
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{
+                                background: getProjectColor(t.relatedProject.id),
+                              }}
+                              aria-hidden
+                              title={t.relatedProject.name}
+                            />
                           )}
-                        >
-                          {t.title}
-                        </p>
+                          <p
+                            className={cn(
+                              "text-sm font-medium text-foreground truncate",
+                              done && "line-through text-muted-foreground"
+                            )}
+                          >
+                            {t.relatedProject ? (
+                              <span className="text-muted-foreground font-normal">
+                                [{t.relatedProject.name}]{" "}
+                              </span>
+                            ) : t.related_type === "project" ? (
+                              // Tâche dont le projet a été supprimé : on garde
+                              // la tâche, on indique qu'elle est orpheline
+                              <span className="text-muted-foreground/70 italic font-normal text-[11px]">
+                                (projet supprimé){" "}
+                              </span>
+                            ) : null}
+                            {t.title}
+                          </p>
+                        </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {t.priority !== "normal" && (
                             <span
@@ -350,14 +408,23 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
                             👤 {t.assignee.full_name}
                           </span>
                         )}
-                        {relatedHref && t.related_type && (
+                        {t.related_type === "project" ? (
+                          t.relatedProject ? (
+                            <Link
+                              href={`/dashboard/projets/${t.relatedProject.id}`}
+                              className="text-[11px] text-accent hover:underline"
+                            >
+                              ↗ {t.relatedProject.name}
+                            </Link>
+                          ) : null
+                        ) : relatedHref && t.related_type ? (
                           <Link
                             href={relatedHref}
                             className="text-[11px] text-accent hover:underline"
                           >
                             ↗ {RELATED_LABEL[t.related_type]}
                           </Link>
-                        )}
+                        ) : null}
                       </div>
                     </div>
 

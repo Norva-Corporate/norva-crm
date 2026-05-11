@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Search, Trophy, Ban, Trash2 } from "lucide-react";
+import { Loader2, Search, Trophy, Ban, Trash2, Sparkles, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { cn, formatDate } from "@/lib/utils";
 import {
   createDeal,
@@ -290,6 +291,39 @@ export function DealDrawer({
                   required
                 />
               </div>
+
+              {/* Origine — lead converti */}
+              {isEdit && deal?.source_lead && (
+                <div className="flex items-start gap-2 px-2.5 py-2 bg-accent/5 border border-accent/20 text-xs">
+                  <Sparkles className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-0.5">
+                      Lead d&apos;origine
+                    </p>
+                    <p className="text-foreground truncate">
+                      {[
+                        deal.source_lead.first_name,
+                        deal.source_lead.last_name,
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || "(Sans nom)"}
+                      {deal.source_lead.company_name && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          — {deal.source_lead.company_name}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <Link
+                    href="/dashboard/leads"
+                    className="text-accent hover:underline inline-flex items-center gap-1 shrink-0"
+                  >
+                    Voir
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
+              )}
 
               {/* Tags (édition uniquement) */}
               {isEdit && deal?.id && (

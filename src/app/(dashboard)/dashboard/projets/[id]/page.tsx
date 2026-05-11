@@ -2,6 +2,7 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProjectWithDetails } from "@/lib/actions/projects";
+import { getTasksForProject } from "@/lib/actions/tasks";
 import { getActivitiesForEntity } from "@/lib/actions/activities";
 import { getTagsForEntity } from "@/lib/actions/tags";
 import { getFieldsWithValues } from "@/lib/actions/custom-fields";
@@ -27,6 +28,7 @@ export default async function ProjectDetailPage({
     activities,
     tags,
     customFields,
+    projectTasks,
   ] = await Promise.all([
     supabase
       .from("deals")
@@ -43,6 +45,7 @@ export default async function ProjectDetailPage({
     getActivitiesForEntity("project", id),
     getTagsForEntity("project", id),
     getFieldsWithValues("project", id),
+    getTasksForProject(id),
   ]);
 
   return (
@@ -58,6 +61,7 @@ export default async function ProjectDetailPage({
       activities={activities as any}
       tags={tags}
       customFields={customFields}
+      tasks={projectTasks}
     />
   );
 }
