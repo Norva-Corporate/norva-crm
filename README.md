@@ -1,6 +1,6 @@
 # norva-crm
 
-Internal CRM for **Agence Prime** — manage contacts, companies, deal pipeline, projects, and billing in one place.
+Internal CRM for **Norva - Corporate** — manage contacts, companies, deal pipeline, projects, and billing in one place.
 
 Built for a small team (2–5 people) with Next.js 14, Supabase, and a custom design system.
 
