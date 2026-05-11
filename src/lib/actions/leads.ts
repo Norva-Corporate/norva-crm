@@ -2,10 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  getActivitiesForEntity,
+} from "@/lib/actions/activities";
+import { getFieldsWithValues } from "@/lib/actions/custom-fields";
+import { getTagsForEntity } from "@/lib/actions/tags";
 
 export type ActionResult<T = null> =
   | { success: true; data: T }
   | { success: false; error: string };
+
+export type LeadStatus =
+  | "pending"
+  | "qualified"
+  | "converted"
+  | "dismissed"
+  | "duplicate";
+
+export type LeadTemperature = "cold" | "warm" | "hot";
 
 export interface LeadImport {
   id: string;
@@ -18,7 +32,7 @@ export interface LeadImport {
   role: string | null;
   company_name: string | null;
   company_domain: string | null;
-  status: "pending" | "converted" | "dismissed" | "duplicate";
+  status: LeadStatus;
   contact_id: string | null;
   company_id: string | null;
   duplicate_of: string | null;
@@ -27,6 +41,19 @@ export interface LeadImport {
   processed_at: string | null;
   processed_by: string | null;
   notes: string | null;
+  // Qualification (016)
+  assigned_to: string | null;
+  temperature: LeadTemperature | null;
+  qualification_score: number | null;
+  next_follow_up_at: string | null;
+  estimated_budget: number | null;
+  expected_close_date: string | null;
+}
+
+export interface LeadAssignee {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
 export interface LeadWithDedup extends LeadImport {
@@ -34,13 +61,16 @@ export interface LeadWithDedup extends LeadImport {
   existing_contact_name: string | null;
   existing_company_id: string | null;
   existing_company_name: string | null;
+  assignee: LeadAssignee | null;
 }
 
 export async function listLeads(): Promise<LeadWithDedup[]> {
   const supabase = await createClient();
   const { data: leads } = await supabase
     .from("lead_imports")
-    .select("*")
+    .select(
+      "*, assignee:profiles!lead_imports_assigned_to_fkey(id, full_name, avatar_url)"
+    )
     .order("imported_at", { ascending: false })
     .limit(200);
   if (!leads) return [];
@@ -94,12 +124,18 @@ export async function listLeads(): Promise<LeadWithDedup[]> {
     const matchCompany = l.company_domain
       ? companyByDomain.get(l.company_domain.toLowerCase())
       : null;
+    // Supabase typing: nested fk-resolved relation may come back as object or array
+    const rawAssignee = (l as { assignee?: unknown }).assignee;
+    const assignee = (
+      Array.isArray(rawAssignee) ? rawAssignee[0] : rawAssignee
+    ) as LeadAssignee | null | undefined;
     return {
       ...l,
       existing_contact_id: matchContact?.id ?? null,
       existing_contact_name: matchContact?.name ?? null,
       existing_company_id: matchCompany?.id ?? null,
       existing_company_name: matchCompany?.name ?? null,
+      assignee: assignee ?? null,
     } as LeadWithDedup;
   });
 }
@@ -290,4 +326,151 @@ export async function reopenLead(leadId: string): Promise<ActionResult> {
   if (error) return { success: false, error: error.message };
   revalidatePath("/dashboard/leads");
   return { success: true, data: null };
+}
+
+// ============================================================
+// Qualification (016)
+// ============================================================
+
+export interface LeadUpdatePatch {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  company_name?: string | null;
+  company_domain?: string | null;
+  notes?: string | null;
+  assigned_to?: string | null;
+  temperature?: LeadTemperature | null;
+  qualification_score?: number | null;
+  next_follow_up_at?: string | null;
+  estimated_budget?: number | null;
+  expected_close_date?: string | null;
+}
+
+const ALLOWED_UPDATE_KEYS: (keyof LeadUpdatePatch)[] = [
+  "first_name",
+  "last_name",
+  "email",
+  "phone",
+  "role",
+  "company_name",
+  "company_domain",
+  "notes",
+  "assigned_to",
+  "temperature",
+  "qualification_score",
+  "next_follow_up_at",
+  "estimated_budget",
+  "expected_close_date",
+];
+
+/**
+ * Update arbitrary fields on a lead. Used by the LeadDrawer for inline edits.
+ * Only whitelisted keys are applied — unknown keys are silently dropped.
+ */
+export async function updateLead(
+  leadId: string,
+  patch: LeadUpdatePatch
+): Promise<ActionResult<LeadImport>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const cleaned: Record<string, unknown> = {};
+  for (const k of ALLOWED_UPDATE_KEYS) {
+    if (k in patch) {
+      const v = patch[k];
+      // Normalize empty strings to null so we don't store ''
+      cleaned[k] = typeof v === "string" && v.trim() === "" ? null : v;
+    }
+  }
+  if (Object.keys(cleaned).length === 0) {
+    // Nothing to update — read current value to keep the contract.
+    const { data } = await supabase
+      .from("lead_imports")
+      .select("*")
+      .eq("id", leadId)
+      .single();
+    return data
+      ? { success: true, data: data as LeadImport }
+      : { success: false, error: "Lead introuvable." };
+  }
+
+  const { data, error } = await supabase
+    .from("lead_imports")
+    .update(cleaned)
+    .eq("id", leadId)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return {
+      success: false,
+      error: error?.message ?? "Mise à jour impossible.",
+    };
+  }
+  revalidatePath("/dashboard/leads");
+  return { success: true, data: data as LeadImport };
+}
+
+/**
+ * Mark a lead as qualified — only valid from 'pending'.
+ * No-op if the lead is already in another state.
+ */
+export async function qualifyLead(leadId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const { data: lead } = await supabase
+    .from("lead_imports")
+    .select("status")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { success: false, error: "Lead introuvable." };
+  if (lead.status !== "pending") {
+    return {
+      success: false,
+      error: "Seuls les leads à traiter peuvent être qualifiés.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("lead_imports")
+    .update({ status: "qualified" })
+    .eq("id", leadId);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/dashboard/leads");
+  return { success: true, data: null };
+}
+
+/**
+ * Fetches everything needed to render the LeadDrawer details panel:
+ * activities timeline, custom fields with values, attached tags.
+ */
+export async function getLeadDetails(leadId: string) {
+  const [activities, customFields, tags] = await Promise.all([
+    getActivitiesForEntity("lead_import", leadId),
+    getFieldsWithValues("lead_import", leadId),
+    getTagsForEntity("lead_import", leadId),
+  ]);
+  return { activities, customFields, tags };
+}
+
+/**
+ * Lightweight list of profiles (id + display data) for the assignee picker.
+ */
+export async function listProfilesLight(): Promise<LeadAssignee[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, avatar_url")
+    .order("full_name", { ascending: true });
+  return (data ?? []) as LeadAssignee[];
 }

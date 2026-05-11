@@ -21,16 +21,20 @@ import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
+import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { AgentButton } from "@/components/agents/agent-button";
 import { AgentTasksPanel } from "@/components/agents/agent-tasks-panel";
 import { Sparkles, Globe2 } from "lucide-react";
-import { deleteContact } from "@/lib/actions/contacts";
+import { deleteContact, patchContact, type ContactPatch } from "@/lib/actions/contacts";
+import { InlineText } from "@/components/ui/inline-text";
+import { InlinePicker } from "@/components/ui/inline-picker";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
 import type {
   Activity,
   AgentTask,
   Contact,
   Company,
+  CustomFieldWithValue,
   DealStage,
   Tag,
 } from "@/types";
@@ -57,6 +61,7 @@ interface Props {
   })[];
   tags?: Tag[];
   agentTasks?: AgentTask[];
+  customFields?: CustomFieldWithValue[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -75,6 +80,7 @@ export function ContactDetailClient({
   activities = [],
   tags = [],
   agentTasks = [],
+  customFields = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -91,6 +97,13 @@ export function ContactDetailClient({
   }
 
   const totalValue = deals.reduce((sum, d) => sum + (d.value ?? 0), 0);
+
+  const patch =
+    (field: keyof ContactPatch) =>
+    (value: string | null) =>
+      patchContact(contact.id, { [field]: value } as ContactPatch);
+
+  const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
 
   return (
     <>
@@ -115,15 +128,34 @@ export function ContactDetailClient({
                   {getInitials(`${contact.first_name} ${contact.last_name}`)}
                 </AvatarFallback>
               </Avatar>
-              <div className="space-y-1 pt-1">
-                <h2 className="text-xl font-semibold text-foreground">
-                  {contact.first_name} {contact.last_name}
-                </h2>
-                {contact.role && (
-                  <p className="text-sm text-muted-foreground">
-                    {contact.role}
-                  </p>
-                )}
+              <div className="space-y-1 pt-1 min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5 text-xl font-semibold text-foreground">
+                  <InlineText
+                    value={contact.first_name}
+                    onSave={patch("first_name")}
+                    ariaLabel="Prénom"
+                    required
+                    placeholder="Prénom"
+                    className="max-w-[12rem]"
+                  />
+                  <InlineText
+                    value={contact.last_name}
+                    onSave={patch("last_name")}
+                    ariaLabel="Nom"
+                    required
+                    placeholder="Nom"
+                    className="max-w-[12rem]"
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <InlineText
+                    value={contact.role}
+                    onSave={patch("role")}
+                    ariaLabel="Rôle"
+                    placeholder="Ajouter un rôle…"
+                    className="max-w-[20rem]"
+                  />
+                </div>
                 {contact.company && (
                   <Link
                     href={`/dashboard/companies/${contact.company.id}`}
@@ -188,40 +220,62 @@ export function ContactDetailClient({
             </h3>
             <dl className="space-y-3">
               <InfoRow icon={Mail} label="Email">
-                {contact.email ? (
-                  <a
-                    href={`mailto:${contact.email}`}
-                    className="text-xs text-accent hover:underline"
-                  >
-                    {contact.email}
-                  </a>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
+                <InlineText
+                  value={contact.email}
+                  onSave={patch("email")}
+                  ariaLabel="Email"
+                  variant="email"
+                  placeholder="email@exemple.com"
+                  displayClassName="text-xs"
+                  displayAs={(v) => (
+                    <a
+                      href={`mailto:${v}`}
+                      className="text-accent hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {v}
+                    </a>
+                  )}
+                />
               </InfoRow>
               <InfoRow icon={Phone} label="Téléphone">
-                {contact.phone ? (
-                  <a
-                    href={`tel:${contact.phone}`}
-                    className="text-xs text-foreground hover:text-accent"
-                  >
-                    {contact.phone}
-                  </a>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
+                <InlineText
+                  value={contact.phone}
+                  onSave={patch("phone")}
+                  ariaLabel="Téléphone"
+                  variant="tel"
+                  placeholder="+33 …"
+                  displayClassName="text-xs"
+                  displayAs={(v) => (
+                    <a
+                      href={`tel:${v}`}
+                      className="text-foreground hover:text-accent"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {v}
+                    </a>
+                  )}
+                />
               </InfoRow>
               <InfoRow icon={Building2} label="Entreprise">
-                {contact.company ? (
-                  <Link
-                    href={`/dashboard/companies/${contact.company.id}`}
-                    className="text-xs text-accent hover:underline"
-                  >
-                    {contact.company.name}
-                  </Link>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
+                <InlinePicker
+                  variant="select"
+                  value={contact.company_id ?? null}
+                  onSave={patch("company_id")}
+                  ariaLabel="Entreprise"
+                  options={companyOptions}
+                  allowEmpty
+                  emptyLabel="Aucune entreprise"
+                  displayAs={(id) => {
+                    if (!id) return <span className="text-xs text-muted-foreground">—</span>;
+                    const c = companies.find((x) => x.id === id);
+                    return c ? (
+                      <span className="text-xs text-accent">{c.name}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    );
+                  }}
+                />
               </InfoRow>
               <InfoRow icon={Calendar} label="Créé le">
                 <span className="text-xs text-foreground">
@@ -230,16 +284,20 @@ export function ContactDetailClient({
               </InfoRow>
             </dl>
 
-            {contact.notes && (
-              <div className="pt-3 border-t border-[var(--border)]">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
-                  Notes
-                </p>
-                <p className="text-xs text-foreground whitespace-pre-wrap">
-                  {contact.notes}
-                </p>
-              </div>
-            )}
+            <div className="pt-3 border-t border-[var(--border)]">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+                Notes
+              </p>
+              <InlineText
+                value={contact.notes}
+                onSave={patch("notes")}
+                ariaLabel="Notes"
+                variant="textarea"
+                placeholder="Ajouter des notes…"
+                displayClassName="text-xs whitespace-pre-wrap"
+                rows={5}
+              />
+            </div>
           </Card>
 
           {/* Deals */}
@@ -310,6 +368,12 @@ export function ContactDetailClient({
           entityType="contact"
           entityId={contact.id}
           initialTasks={agentTasks}
+        />
+
+        <CustomFieldsPanel
+          entityType="contact"
+          entityId={contact.id}
+          initialFields={customFields}
         />
 
         <ActivityTimeline

@@ -81,6 +81,10 @@ export interface Project {
   status: ProjectStatus;
   deal_id: string | null;
   deal?: Deal;
+  contact_id: string | null;
+  contact?: Contact;
+  company_id: string | null;
+  company?: Company;
   start_date: string | null;
   end_date: string | null;
   budget: number | null;
@@ -208,7 +212,8 @@ export type ActivityEntityType =
   | "company"
   | "deal"
   | "project"
-  | "invoice";
+  | "invoice"
+  | "lead_import";
 
 export type ActivityType =
   | "deal_created"
@@ -257,7 +262,12 @@ export interface Notification {
 // ============================================================
 // Tags
 // ============================================================
-export type TagEntityType = "contact" | "company" | "deal" | "project";
+export type TagEntityType =
+  | "contact"
+  | "company"
+  | "deal"
+  | "project"
+  | "lead_import";
 
 export interface Tag {
   id: string;
@@ -369,4 +379,52 @@ export interface DiscussionRead {
 export interface ChannelWithUnread extends DiscussionChannel {
   unread_count: number;
   last_read_at: string | null;
+}
+
+// ============================================================
+// Custom Fields
+// ============================================================
+
+export type CustomFieldType =
+  | "text"
+  | "number"
+  | "date"
+  | "select"
+  | "url"
+  | "boolean";
+
+export type CustomFieldEntityType =
+  | "contact"
+  | "company"
+  | "deal"
+  | "project"
+  | "lead_import";
+
+export interface CustomFieldDefinition {
+  id: string;
+  entity_type: CustomFieldEntityType;
+  name: string;
+  field_type: CustomFieldType;
+  options: string[] | null;
+  required: boolean;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomFieldValue {
+  id: string;
+  field_id: string;
+  entity_type: CustomFieldEntityType;
+  entity_id: string;
+  value: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Définition enrichie avec la valeur courante pour une entité donnée. */
+export interface CustomFieldWithValue extends CustomFieldDefinition {
+  value: string | null;
+  value_id: string | null;
 }

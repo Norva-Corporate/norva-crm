@@ -18,11 +18,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ConvertLeadDrawer } from "@/components/leads/ConvertLeadDrawer";
+import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import {
   dismissLead,
   markLeadAsDuplicate,
   reopenLead,
+  type LeadAssignee,
   type LeadWithDedup,
 } from "@/lib/actions/leads";
 import { AgentButton } from "@/components/agents/agent-button";
@@ -34,13 +35,17 @@ const STATUS_CONFIG: Record<
   { label: string; variant: React.ComponentProps<typeof Badge>["variant"] }
 > = {
   pending: { label: "À traiter", variant: "default" },
+  qualified: { label: "Qualifié", variant: "warning" },
   converted: { label: "Converti", variant: "success" },
   dismissed: { label: "Rejeté", variant: "secondary" },
   duplicate: { label: "Doublon", variant: "warning" },
 };
 
-const TABS: { key: "pending" | "all" | "converted" | "dismissed"; label: string }[] = [
+type TabKey = "pending" | "qualified" | "all" | "converted" | "dismissed";
+
+const TABS: { key: TabKey; label: string }[] = [
   { key: "pending", label: "À traiter" },
+  { key: "qualified", label: "Qualifiés" },
   { key: "all", label: "Tous" },
   { key: "converted", label: "Convertis" },
   { key: "dismissed", label: "Rejetés" },
@@ -49,21 +54,27 @@ const TABS: { key: "pending" | "all" | "converted" | "dismissed"; label: string 
 interface Props {
   leads: LeadWithDedup[];
   companies: { id: string; name: string }[];
+  profiles: LeadAssignee[];
 }
 
-export function LeadsClient({ leads, companies }: Props) {
+export function LeadsClient({ leads, companies, profiles }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"pending" | "all" | "converted" | "dismissed">(
-    "pending"
-  );
+  const [tab, setTab] = useState<TabKey>("pending");
   const [search, setSearch] = useState("");
-  const [converting, setConverting] = useState<LeadWithDedup | null>(null);
+  const [selected, setSelected] = useState<LeadWithDedup | null>(null);
   const [pending, startTransition] = useTransition();
 
   const counts = useMemo(() => {
-    const c = { pending: 0, converted: 0, dismissed: 0, duplicate: 0 };
+    const c = {
+      pending: 0,
+      qualified: 0,
+      converted: 0,
+      dismissed: 0,
+      duplicate: 0,
+    };
     for (const l of leads) {
       if (l.status === "pending") c.pending++;
+      else if (l.status === "qualified") c.qualified++;
       else if (l.status === "converted") c.converted++;
       else if (l.status === "dismissed") c.dismissed++;
       else if (l.status === "duplicate") c.duplicate++;
@@ -77,6 +88,7 @@ export function LeadsClient({ leads, companies }: Props) {
       const matchesTab =
         tab === "all" ||
         (tab === "pending" && l.status === "pending") ||
+        (tab === "qualified" && l.status === "qualified") ||
         (tab === "converted" &&
           (l.status === "converted" || l.status === "duplicate")) ||
         (tab === "dismissed" && l.status === "dismissed");
@@ -90,6 +102,14 @@ export function LeadsClient({ leads, companies }: Props) {
       return matchesTab && matchesSearch;
     });
   }, [leads, tab, search]);
+
+  // Keep `selected` in sync with the latest data after revalidation
+  // (so inline edits inside the drawer reflect server state without close/reopen).
+  React.useEffect(() => {
+    if (!selected) return;
+    const fresh = leads.find((l) => l.id === selected.id);
+    if (fresh && fresh !== selected) setSelected(fresh);
+  }, [leads, selected]);
 
   const handleDismiss = (lead: LeadWithDedup) => {
     startTransition(async () => {
@@ -119,8 +139,9 @@ export function LeadsClient({ leads, companies }: Props) {
 
       <div className="flex-1 p-6 animate-fade-in space-y-4">
         {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <KPI label="À traiter" value={counts.pending} accent="#3B7BF5" />
+          <KPI label="Qualifiés" value={counts.qualified} accent="#F59E0B" />
           <KPI label="Convertis" value={counts.converted} accent="#22C55E" />
           <KPI label="Doublons" value={counts.duplicate} accent="#F59E0B" />
           <KPI label="Rejetés" value={counts.dismissed} />
@@ -174,10 +195,13 @@ export function LeadsClient({ leads, companies }: Props) {
                     .filter(Boolean)
                     .join(" ") || "(Sans nom)";
                 const isPending = lead.status === "pending";
+                const isQualified = lead.status === "qualified";
+                const canConvert = isPending || isQualified;
                 return (
                   <li
                     key={lead.id}
-                    className="flex items-start gap-4 px-4 py-3 hover:bg-[var(--muted)]/20 transition-colors"
+                    onClick={() => setSelected(lead)}
+                    className="flex items-start gap-4 px-4 py-3 hover:bg-[var(--muted)]/20 transition-colors cursor-pointer"
                   >
                     <Sparkles className="h-3.5 w-3.5 text-accent mt-1 shrink-0" />
 
@@ -238,16 +262,19 @@ export function LeadsClient({ leads, companies }: Props) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isPending ? (
+                    <div
+                      className="flex items-center gap-2 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {canConvert ? (
                         <>
                           <Button
                             size="sm"
-                            onClick={() => setConverting(lead)}
+                            onClick={() => setSelected(lead)}
                             disabled={pending}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            Convertir
+                            Ouvrir
                           </Button>
                           <AgentButton
                             agent="enrichissement"
@@ -311,12 +338,13 @@ export function LeadsClient({ leads, companies }: Props) {
         </Card>
       </div>
 
-      <ConvertLeadDrawer
-        lead={converting}
+      <LeadDrawer
+        lead={selected}
         companies={companies}
-        onOpenChange={(o) => !o && setConverting(null)}
+        profiles={profiles}
+        onOpenChange={(o) => !o && setSelected(null)}
         onSuccess={() => {
-          setConverting(null);
+          setSelected(null);
           startTransition(() => router.refresh());
         }}
       />

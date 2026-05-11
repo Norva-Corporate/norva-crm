@@ -51,6 +51,8 @@ type ProjectRow = Project & {
     contact?: { id: string; first_name: string; last_name: string } | null;
     company?: { id: string; name: string } | null;
   } | null;
+  contact: { id: string; first_name: string; last_name: string } | null;
+  company: { id: string; name: string } | null;
   assignee: { id: string; full_name: string | null } | null;
 };
 
@@ -58,9 +60,17 @@ interface Props {
   initialProjects: ProjectRow[];
   deals: { id: string; title: string }[];
   profiles: { id: string; full_name: string | null }[];
+  contacts: { id: string; first_name: string; last_name: string }[];
+  companies: { id: string; name: string }[];
 }
 
-export function ProjetsClient({ initialProjects, deals, profiles }: Props) {
+export function ProjetsClient({
+  initialProjects,
+  deals,
+  profiles,
+  contacts,
+  companies,
+}: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ProjectStatus>("all");
@@ -216,8 +226,8 @@ export function ProjetsClient({ initialProjects, deals, profiles }: Props) {
                 ) : (
                   filtered.map((project) => {
                     const sc = STATUS_CONFIG[project.status];
-                    const contact = project.deal?.contact;
-                    const company = project.deal?.company;
+                    const contact = project.contact ?? project.deal?.contact;
+                    const company = project.company ?? project.deal?.company;
                     return (
                       <tr
                         key={project.id}
@@ -316,6 +326,8 @@ export function ProjetsClient({ initialProjects, deals, profiles }: Props) {
         project={editing}
         deals={deals}
         profiles={profiles}
+        contacts={contacts}
+        companies={companies}
         onSuccess={handleSuccess}
       />
 

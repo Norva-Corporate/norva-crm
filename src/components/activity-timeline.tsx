@@ -13,7 +13,9 @@ import {
   FileText,
   FolderKanban,
   Kanban,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -24,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { createActivity } from "@/lib/actions/activities";
+import { createActivity, deleteActivity } from "@/lib/actions/activities";
 import { formatRelativeDate, cn } from "@/lib/utils";
 import type { Activity, ActivityEntityType } from "@/types";
 
@@ -184,11 +186,29 @@ export function ActivityTimeline({
 }
 
 function ActivityItem({ activity }: { activity: ActivityRow }) {
+  const router = useRouter();
   const { icon: Icon, color, label, body } = renderActivity(activity);
   const author = activity.author?.full_name ?? "Système";
+  const [deletePending, startDeleteTransition] = useTransition();
+
+  function handleDelete() {
+    if (deletePending) return;
+    const preview = body ? `${label} : ${body.slice(0, 60)}` : label;
+    if (!confirm(`Supprimer cette activité ?\n\n${preview}`)) return;
+
+    startDeleteTransition(async () => {
+      const res = await deleteActivity(activity.id);
+      if (!res.success) {
+        toast.error(res.error, { id: `activity-${activity.id}` });
+        return;
+      }
+      toast.success("Activité supprimée.", { id: `activity-${activity.id}` });
+      router.refresh();
+    });
+  }
 
   return (
-    <li className="flex gap-3">
+    <li className={cn("flex gap-3 group", deletePending && "opacity-60")}>
       <div
         className={cn(
           "h-7 w-7 shrink-0 flex items-center justify-center rounded-sm",
@@ -210,6 +230,25 @@ function ActivityItem({ activity }: { activity: ActivityRow }) {
           </p>
         )}
       </div>
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={deletePending}
+        aria-label="Supprimer cette activité"
+        className={cn(
+          "h-6 w-6 shrink-0 flex items-center justify-center rounded-sm",
+          "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+          "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+          "transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive",
+          "disabled:cursor-not-allowed"
+        )}
+      >
+        {deletePending ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <Trash2 className="h-3 w-3" />
+        )}
+      </button>
     </li>
   );
 }

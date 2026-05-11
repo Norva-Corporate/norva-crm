@@ -9,13 +9,20 @@ export type ActionResult<T = null> =
   | { success: false; error: string };
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
-const VALID_ENTITY: TagEntityType[] = ["contact", "company", "deal", "project"];
+const VALID_ENTITY: TagEntityType[] = [
+  "contact",
+  "company",
+  "deal",
+  "project",
+  "lead_import",
+];
 
 const REVALIDATE_MAP: Record<TagEntityType, (id: string) => string[]> = {
   contact: (id) => [`/dashboard/contacts/${id}`, "/dashboard/contacts"],
   company: (id) => [`/dashboard/companies/${id}`, "/dashboard/companies"],
   deal: () => ["/dashboard/pipeline"],
   project: (id) => [`/dashboard/projets/${id}`, "/dashboard/projets"],
+  lead_import: () => ["/dashboard/leads"],
 };
 
 function revalidateForEntity(entityType: TagEntityType, entityId: string) {

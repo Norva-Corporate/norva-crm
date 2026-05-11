@@ -127,6 +127,52 @@ export async function deleteContact(id: string): Promise<ActionResult> {
   return { success: true, data: null };
 }
 
+export type ContactPatch = Partial<{
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  company_id: string | null;
+  notes: string | null;
+}>;
+
+export async function patchContact(
+  id: string,
+  patch: ContactPatch
+): Promise<ActionResult> {
+  if (
+    "first_name" in patch &&
+    (typeof patch.first_name !== "string" || !patch.first_name.trim())
+  ) {
+    return { success: false, error: "Le prénom est obligatoire." };
+  }
+  if (
+    "last_name" in patch &&
+    (typeof patch.last_name !== "string" || !patch.last_name.trim())
+  ) {
+    return { success: false, error: "Le nom est obligatoire." };
+  }
+
+  const payload: Record<string, unknown> = {};
+  for (const k of Object.keys(patch) as (keyof ContactPatch)[]) {
+    const v = patch[k];
+    if (k === "first_name" || k === "last_name") {
+      payload[k] = (v as string).trim();
+    } else {
+      payload[k] = v === "" ? null : v;
+    }
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("contacts").update(payload).eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  revalidateContacts();
+  revalidatePath(`/dashboard/contacts/${id}`);
+  return { success: true, data: null };
+}
+
 export async function getContactWithDeals(id: string) {
   const supabase = await createClient();
 
@@ -225,6 +271,47 @@ export async function deleteCompany(id: string): Promise<ActionResult> {
   if (error) return { success: false, error: error.message };
 
   revalidateContacts();
+  return { success: true, data: null };
+}
+
+export type CompanyPatch = Partial<{
+  name: string;
+  sector: string | null;
+  domain: string | null;
+  size: string | null;
+  website: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+}>;
+
+export async function patchCompany(
+  id: string,
+  patch: CompanyPatch
+): Promise<ActionResult> {
+  if (
+    "name" in patch &&
+    (typeof patch.name !== "string" || !patch.name.trim())
+  ) {
+    return { success: false, error: "Le nom est obligatoire." };
+  }
+
+  const payload: Record<string, unknown> = {};
+  for (const k of Object.keys(patch) as (keyof CompanyPatch)[]) {
+    const v = patch[k];
+    if (k === "name") {
+      payload[k] = (v as string).trim();
+    } else {
+      payload[k] = v === "" ? null : v;
+    }
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("companies").update(payload).eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  revalidateContacts();
+  revalidatePath(`/dashboard/companies/${id}`);
   return { success: true, data: null };
 }
 

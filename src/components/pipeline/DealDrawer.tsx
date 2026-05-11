@@ -31,10 +31,17 @@ import {
   type DealInput,
 } from "@/lib/actions/deals";
 import { getTagsForEntity } from "@/lib/actions/tags";
+import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { EntityTags } from "@/components/tags/entity-tags";
+import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { AgentButton } from "@/components/agents/agent-button";
 import { Target } from "lucide-react";
-import type { DealStage, DealWithRelations, Tag } from "@/types";
+import type {
+  CustomFieldWithValue,
+  DealStage,
+  DealWithRelations,
+  Tag,
+} from "@/types";
 import { STAGES } from "./stages";
 
 interface ContactOption {
@@ -109,16 +116,23 @@ export function DealDrawer({
   const [deletePending, startDeleteTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [dealTags, setDealTags] = useState<Tag[]>([]);
+  const [customFields, setCustomFields] = useState<CustomFieldWithValue[]>([]);
 
   // Load tags when drawer opens for an existing deal
   useEffect(() => {
     if (!open || !deal?.id) {
       setDealTags([]);
+      setCustomFields([]);
       return;
     }
     let cancelled = false;
-    getTagsForEntity("deal", deal.id).then((tags) => {
-      if (!cancelled) setDealTags(tags);
+    Promise.all([
+      getTagsForEntity("deal", deal.id),
+      getFieldsWithValues("deal", deal.id),
+    ]).then(([tags, fields]) => {
+      if (cancelled) return;
+      setDealTags(tags);
+      setCustomFields(fields);
     });
     return () => {
       cancelled = true;
@@ -496,6 +510,16 @@ export function DealDrawer({
                     onChange={(e) => update("notes", e.target.value)}
                     rows={3}
                     placeholder="Notes internes…"
+                  />
+                </div>
+              )}
+
+              {isEdit && deal?.id && (
+                <div className="pt-2 border-t border-[var(--border)] -mx-1">
+                  <CustomFieldsPanel
+                    entityType="deal"
+                    entityId={deal.id}
+                    initialFields={customFields}
                   />
                 </div>
               )}

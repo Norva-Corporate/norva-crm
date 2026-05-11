@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   Plug,
   MessagesSquare,
+  Settings2,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -47,6 +48,7 @@ const navItems: NavItem[] = [
   { label: "Facturation", href: "/dashboard/facturation", icon: FileText },
   { label: "Reporting", href: "/dashboard/reporting", icon: BarChart3 },
   { label: "Intégrations", href: "/dashboard/integrations", icon: Plug },
+  { label: "Champs perso", href: "/dashboard/settings/custom-fields", icon: Settings2 },
 ];
 
 interface SidebarProps {

@@ -19,9 +19,14 @@ import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
+import { InlineText } from "@/components/ui/inline-text";
+import { InlinePicker } from "@/components/ui/inline-picker";
+import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
+import { patchProject, type ProjectPatch } from "@/lib/actions/projects";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type {
   Activity,
+  CustomFieldWithValue,
   Project,
   ProjectStatus,
   InvoiceStatus,
@@ -71,6 +76,8 @@ type ProjectDetail = Project & {
     contact?: { id: string; first_name: string; last_name: string } | null;
     company?: { id: string; name: string } | null;
   } | null;
+  contact: { id: string; first_name: string; last_name: string } | null;
+  company: { id: string; name: string } | null;
   assignee: { id: string; full_name: string | null } | null;
   invoices: InvoiceLite[];
 };
@@ -90,6 +97,7 @@ interface Props {
     } | null;
   })[];
   tags?: Tag[];
+  customFields?: CustomFieldWithValue[];
 }
 
 export function ProjectDetailClient({
@@ -101,6 +109,7 @@ export function ProjectDetailClient({
   companies,
   activities = [],
   tags = [],
+  customFields = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -134,6 +143,45 @@ export function ProjectDetailClient({
     startTransition(() => router.refresh());
   }
 
+  const patch =
+    (field: keyof ProjectPatch) =>
+    (value: string | null) =>
+      patchProject(project.id, { [field]: value } as ProjectPatch);
+
+  const patchBudget = (value: string | null) =>
+    patchProject(project.id, {
+      budget: value == null || value === "" ? null : Number(value),
+    });
+
+  const patchStatus = (value: string | null) =>
+    patchProject(project.id, {
+      status: (value ?? undefined) as ProjectStatus | undefined,
+    });
+
+  const statusOptions = (Object.keys(STATUS_CONFIG) as ProjectStatus[]).map(
+    (key) => ({ value: key, label: STATUS_CONFIG[key].label })
+  );
+
+  const dealOptions = deals.map((d) => ({ value: d.id, label: d.title }));
+
+  const profileOptions = profiles.map((p) => ({
+    value: p.id,
+    label: p.full_name ?? p.id,
+  }));
+
+  const contactOptions = contacts.map((c) => ({
+    value: c.id,
+    label: `${c.first_name} ${c.last_name}`,
+  }));
+
+  const companyOptions = companies.map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+
+  const contactDisplay = project.contact ?? project.deal?.contact ?? null;
+  const companyDisplay = project.company ?? project.deal?.company ?? null;
+
   return (
     <>
       <div className="flex-1 p-6 animate-fade-in space-y-4">
@@ -148,17 +196,43 @@ export function ProjectDetailClient({
 
         {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-1.5">
-            <h1 className="text-xl font-semibold text-foreground">
-              {project.name}
-            </h1>
-            <div className="flex items-center gap-2">
-              <Badge variant={sc.variant}>{sc.label}</Badge>
-              {project.budget != null && (
-                <span className="text-xs text-muted-foreground font-mono">
-                  Budget : {formatCurrency(project.budget)}
-                </span>
-              )}
+          <div className="space-y-1.5 min-w-0 flex-1">
+            <div className="text-xl font-semibold text-foreground">
+              <InlineText
+                value={project.name}
+                onSave={patch("name")}
+                ariaLabel="Nom du projet"
+                required
+                placeholder="Nom du projet"
+                className="max-w-[32rem]"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <InlinePicker
+                variant="select"
+                value={project.status}
+                onSave={patchStatus}
+                ariaLabel="Statut"
+                options={statusOptions}
+                displayAs={(v) => {
+                  const cfg = STATUS_CONFIG[v as ProjectStatus] ?? sc;
+                  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+                }}
+              />
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                Budget :
+                <InlineText
+                  value={project.budget != null ? String(project.budget) : null}
+                  onSave={patchBudget}
+                  ariaLabel="Budget"
+                  variant="number"
+                  placeholder="0"
+                  inputClassName="w-32"
+                  displayAs={(v) => (
+                    <span className="text-foreground">{formatCurrency(Number(v))}</span>
+                  )}
+                />
+              </span>
             </div>
             <EntityTags
               entityType="project"
@@ -180,47 +254,137 @@ export function ProjectDetailClient({
               Informations
             </h2>
             <InfoRow icon={User} label="Client">
-              {project.deal?.contact ? (
-                <Link
-                  href={`/dashboard/contacts/${project.deal.contact.id}`}
-                  className="text-sm text-foreground hover:text-accent"
-                >
-                  {project.deal.contact.first_name} {project.deal.contact.last_name}
-                </Link>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+              <InlinePicker
+                variant="select"
+                value={project.contact_id ?? null}
+                onSave={patch("contact_id")}
+                ariaLabel="Client"
+                options={contactOptions}
+                allowEmpty
+                emptyLabel="Aucun client"
+                displayAs={(id) => {
+                  if (id) {
+                    const c =
+                      project.contact && project.contact.id === id
+                        ? project.contact
+                        : contacts.find((x) => x.id === id);
+                    if (c) {
+                      return (
+                        <Link
+                          href={`/dashboard/contacts/${c.id}`}
+                          className="text-sm text-foreground hover:text-accent"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {c.first_name} {c.last_name}
+                        </Link>
+                      );
+                    }
+                  }
+                  if (contactDisplay) {
+                    return (
+                      <Link
+                        href={`/dashboard/contacts/${contactDisplay.id}`}
+                        className="text-sm text-muted-foreground italic hover:text-accent"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {contactDisplay.first_name} {contactDisplay.last_name} (du deal)
+                      </Link>
+                    );
+                  }
+                  return <span className="text-sm text-muted-foreground">—</span>;
+                }}
+              />
             </InfoRow>
             <InfoRow icon={Building2} label="Entreprise">
-              {project.deal?.company ? (
-                <Link
-                  href={`/dashboard/companies/${project.deal.company.id}`}
-                  className="text-sm text-foreground hover:text-accent"
-                >
-                  {project.deal.company.name}
-                </Link>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+              <InlinePicker
+                variant="select"
+                value={project.company_id ?? null}
+                onSave={patch("company_id")}
+                ariaLabel="Entreprise"
+                options={companyOptions}
+                allowEmpty
+                emptyLabel="Aucune entreprise"
+                displayAs={(id) => {
+                  if (id) {
+                    const c =
+                      project.company && project.company.id === id
+                        ? project.company
+                        : companies.find((x) => x.id === id);
+                    if (c) {
+                      return (
+                        <Link
+                          href={`/dashboard/companies/${c.id}`}
+                          className="text-sm text-foreground hover:text-accent"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {c.name}
+                        </Link>
+                      );
+                    }
+                  }
+                  if (companyDisplay) {
+                    return (
+                      <Link
+                        href={`/dashboard/companies/${companyDisplay.id}`}
+                        className="text-sm text-muted-foreground italic hover:text-accent"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {companyDisplay.name} (du deal)
+                      </Link>
+                    );
+                  }
+                  return <span className="text-sm text-muted-foreground">—</span>;
+                }}
+              />
             </InfoRow>
             <InfoRow icon={TrendingUp} label="Deal lié">
-              {project.deal ? (
-                <span className="text-sm text-foreground">
-                  {project.deal.title}
-                  {project.deal.value != null && (
-                    <span className="text-muted-foreground ml-2 font-mono">
-                      {formatCurrency(project.deal.value)}
+              <InlinePicker
+                variant="select"
+                value={project.deal_id ?? null}
+                onSave={patch("deal_id")}
+                ariaLabel="Deal lié"
+                options={dealOptions}
+                allowEmpty
+                emptyLabel="Aucun deal"
+                displayAs={(id) => {
+                  if (!id) return <span className="text-sm text-muted-foreground">—</span>;
+                  const d =
+                    project.deal && project.deal.id === id
+                      ? project.deal
+                      : null;
+                  const label = d?.title ?? deals.find((x) => x.id === id)?.title;
+                  return (
+                    <span className="text-sm text-foreground">
+                      {label ?? "—"}
+                      {d?.value != null && (
+                        <span className="text-muted-foreground ml-2 font-mono">
+                          {formatCurrency(d.value)}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+                  );
+                }}
+              />
             </InfoRow>
             <InfoRow icon={User} label="Responsable">
-              <span className="text-sm text-foreground">
-                {project.assignee?.full_name ?? "Non assigné"}
-              </span>
+              <InlinePicker
+                variant="select"
+                value={project.assigned_to ?? null}
+                onSave={patch("assigned_to")}
+                ariaLabel="Responsable"
+                options={profileOptions}
+                allowEmpty
+                emptyLabel="Non assigné"
+                displayAs={(id) => {
+                  if (!id) return <span className="text-sm text-muted-foreground">Non assigné</span>;
+                  const p = profiles.find((x) => x.id === id);
+                  return (
+                    <span className="text-sm text-foreground">
+                      {p?.full_name ?? id}
+                    </span>
+                  );
+                }}
+              />
             </InfoRow>
           </Card>
 
@@ -229,14 +393,30 @@ export function ProjectDetailClient({
               Calendrier
             </h2>
             <InfoRow icon={Calendar} label="Début">
-              <span className="text-sm text-foreground font-mono">
-                {formatDate(project.start_date)}
-              </span>
+              <InlinePicker
+                variant="date"
+                value={project.start_date}
+                onSave={patch("start_date")}
+                ariaLabel="Date de début"
+                displayAs={(v) => (
+                  <span className="text-sm text-foreground font-mono">
+                    {formatDate(v)}
+                  </span>
+                )}
+              />
             </InfoRow>
             <InfoRow icon={Calendar} label="Fin prévue">
-              <span className="text-sm text-foreground font-mono">
-                {formatDate(project.end_date)}
-              </span>
+              <InlinePicker
+                variant="date"
+                value={project.end_date}
+                onSave={patch("end_date")}
+                ariaLabel="Date de fin"
+                displayAs={(v) => (
+                  <span className="text-sm text-foreground font-mono">
+                    {formatDate(v)}
+                  </span>
+                )}
+              />
             </InfoRow>
 
             {dateProgress && (
@@ -265,16 +445,20 @@ export function ProjectDetailClient({
         </div>
 
         {/* Notes */}
-        {project.description && (
-          <Card className="p-4">
-            <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-              Notes
-            </h2>
-            <p className="text-sm text-foreground whitespace-pre-wrap">
-              {project.description}
-            </p>
-          </Card>
-        )}
+        <Card className="p-4">
+          <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+            Notes
+          </h2>
+          <InlineText
+            value={project.description}
+            onSave={patch("description")}
+            ariaLabel="Description"
+            variant="textarea"
+            placeholder="Ajouter une description…"
+            displayClassName="text-sm whitespace-pre-wrap"
+            rows={5}
+          />
+        </Card>
 
         {/* Invoices */}
         <Card className="p-4 space-y-3">
@@ -376,6 +560,12 @@ export function ProjectDetailClient({
           )}
         </Card>
 
+        <CustomFieldsPanel
+          entityType="project"
+          entityId={project.id}
+          initialFields={customFields}
+        />
+
         {/* Activity timeline */}
         <ActivityTimeline
           entityType="project"
@@ -390,6 +580,8 @@ export function ProjectDetailClient({
         project={project}
         deals={deals}
         profiles={profiles}
+        contacts={contacts}
+        companies={companies}
         onSuccess={handleSuccess}
       />
 

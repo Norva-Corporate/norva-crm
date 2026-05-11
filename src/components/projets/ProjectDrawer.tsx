@@ -44,6 +44,8 @@ interface ProjectDrawerProps {
   project?: Project | null;
   deals: { id: string; title: string }[];
   profiles: { id: string; full_name: string | null }[];
+  contacts: { id: string; first_name: string; last_name: string }[];
+  companies: { id: string; name: string }[];
   defaultDealId?: string;
   onSuccess?: (id?: string) => void;
 }
@@ -53,6 +55,8 @@ interface FormState {
   description: string;
   status: ProjectStatus;
   deal_id: string;
+  contact_id: string;
+  company_id: string;
   start_date: string;
   end_date: string;
   budget: string;
@@ -64,6 +68,8 @@ const empty: FormState = {
   description: "",
   status: "en_attente",
   deal_id: "",
+  contact_id: "",
+  company_id: "",
   start_date: "",
   end_date: "",
   budget: "",
@@ -76,6 +82,8 @@ export function ProjectDrawer({
   project,
   deals,
   profiles,
+  contacts,
+  companies,
   defaultDealId,
   onSuccess,
 }: ProjectDrawerProps) {
@@ -94,6 +102,8 @@ export function ProjectDrawer({
           description: project.description ?? "",
           status: project.status,
           deal_id: project.deal_id ?? "",
+          contact_id: project.contact_id ?? "",
+          company_id: project.company_id ?? "",
           start_date: project.start_date ?? "",
           end_date: project.end_date ?? "",
           budget: project.budget != null ? String(project.budget) : "",
@@ -119,6 +129,8 @@ export function ProjectDrawer({
       description: form.description || null,
       status: form.status,
       deal_id: form.deal_id || null,
+      contact_id: form.contact_id || null,
+      company_id: form.company_id || null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       budget: form.budget ? parseFloat(form.budget) : null,
@@ -241,6 +253,61 @@ export function ProjectDrawer({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Client</Label>
+                  <Select
+                    value={form.contact_id || NO_VALUE}
+                    onValueChange={(v) =>
+                      setForm((f) => ({
+                        ...f,
+                        contact_id: v === NO_VALUE ? "" : v,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_VALUE}>
+                        <span className="text-muted-foreground">Aucun</span>
+                      </SelectItem>
+                      {contacts.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.first_name} {c.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Entreprise</Label>
+                  <Select
+                    value={form.company_id || NO_VALUE}
+                    onValueChange={(v) =>
+                      setForm((f) => ({
+                        ...f,
+                        company_id: v === NO_VALUE ? "" : v,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une entreprise" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_VALUE}>
+                        <span className="text-muted-foreground">Aucune</span>
+                      </SelectItem>
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-1.5">

@@ -25,9 +25,17 @@ import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { CompanyDrawer } from "@/components/contacts/CompanyDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { EntityTags } from "@/components/tags/entity-tags";
-import { deleteCompany } from "@/lib/actions/contacts";
+import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
+import { deleteCompany, patchCompany, type CompanyPatch } from "@/lib/actions/contacts";
+import { InlineText } from "@/components/ui/inline-text";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
-import type { Company, Contact, DealStage, Tag } from "@/types";
+import type {
+  Company,
+  Contact,
+  CustomFieldWithValue,
+  DealStage,
+  Tag,
+} from "@/types";
 
 interface DealRow {
   id: string;
@@ -44,6 +52,7 @@ interface Props {
   contacts: Contact[];
   deals: DealRow[];
   tags?: Tag[];
+  customFields?: CustomFieldWithValue[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -60,6 +69,7 @@ export function CompanyDetailClient({
   contacts,
   deals,
   tags = [],
+  customFields = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -81,6 +91,11 @@ export function CompanyDetailClient({
     .filter((d) => d.stage === "won")
     .reduce((sum, d) => sum + (d.value ?? 0), 0);
 
+  const patch =
+    (field: keyof CompanyPatch) =>
+    (value: string | null) =>
+      patchCompany(company.id, { [field]: value } as CompanyPatch);
+
   return (
     <>
       <Header title="Fiche entreprise" />
@@ -101,47 +116,45 @@ export function CompanyDetailClient({
               <div className="h-16 w-16 bg-accent/15 flex items-center justify-center text-lg font-semibold text-accent shrink-0">
                 {getInitials(company.name)}
               </div>
-              <div className="space-y-2 pt-1">
-                <h2 className="text-xl font-semibold text-foreground">
-                  {company.name}
-                </h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {company.sector && (
-                    <Badge variant="default" className="text-[10px]">
-                      {company.sector}
-                    </Badge>
-                  )}
-                  {company.size && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      <Users className="h-3 w-3" />
-                      {company.size} employés
-                    </Badge>
-                  )}
+              <div className="space-y-2 pt-1 min-w-0 flex-1">
+                <div className="text-xl font-semibold text-foreground">
+                  <InlineText
+                    value={company.name}
+                    onSave={patch("name")}
+                    ariaLabel="Nom"
+                    required
+                    placeholder="Nom de l'entreprise"
+                    className="max-w-[24rem]"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    Secteur :
+                    <InlineText
+                      value={company.sector}
+                      onSave={patch("sector")}
+                      ariaLabel="Secteur"
+                      placeholder="Ajouter un secteur"
+                      className="min-w-[6rem]"
+                    />
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    <Users className="h-3 w-3" />
+                    Taille :
+                    <InlineText
+                      value={company.size}
+                      onSave={patch("size")}
+                      ariaLabel="Taille"
+                      placeholder="ex. 11-50"
+                      className="min-w-[5rem]"
+                    />
+                  </span>
                 </div>
                 <EntityTags
                   entityType="company"
                   entityId={company.id}
                   initialTags={tags}
                 />
-                <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                  {company.website && (
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-accent hover:underline"
-                    >
-                      <Globe className="h-3 w-3" />
-                      {company.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                    </a>
-                  )}
-                  {company.phone && (
-                    <span className="inline-flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      {company.phone}
-                    </span>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -199,51 +212,83 @@ export function CompanyDetailClient({
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <InfoRow icon={MapPin} label="Adresse">
-              {company.address ? (
-                <span className="text-xs text-foreground">
-                  {company.address}
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground">—</span>
-              )}
+              <InlineText
+                value={company.address}
+                onSave={patch("address")}
+                ariaLabel="Adresse"
+                placeholder="Ajouter une adresse"
+                displayClassName="text-xs"
+              />
+            </InfoRow>
+            <InfoRow icon={Globe} label="Site web">
+              <InlineText
+                value={company.website}
+                onSave={patch("website")}
+                ariaLabel="Site web"
+                variant="url"
+                placeholder="https://…"
+                displayClassName="text-xs"
+                displayAs={(v) => (
+                  <a
+                    href={v}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {v.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </a>
+                )}
+              />
             </InfoRow>
             <InfoRow icon={Globe} label="Domaine">
-              {company.domain ? (
-                <span className="text-xs text-foreground">
-                  {company.domain}
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground">—</span>
-              )}
+              <InlineText
+                value={company.domain}
+                onSave={patch("domain")}
+                ariaLabel="Domaine"
+                placeholder="exemple.com"
+                displayClassName="text-xs"
+              />
+            </InfoRow>
+            <InfoRow icon={Phone} label="Téléphone">
+              <InlineText
+                value={company.phone}
+                onSave={patch("phone")}
+                ariaLabel="Téléphone"
+                variant="tel"
+                placeholder="+33 …"
+                displayClassName="text-xs"
+                displayAs={(v) => (
+                  <a
+                    href={`tel:${v}`}
+                    className="text-foreground hover:text-accent"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {v}
+                  </a>
+                )}
+              />
             </InfoRow>
             <InfoRow icon={Calendar} label="Créée le">
               <span className="text-xs text-foreground">
                 {formatDate(company.created_at)}
               </span>
             </InfoRow>
-            <InfoRow icon={Phone} label="Téléphone">
-              {company.phone ? (
-                <a
-                  href={`tel:${company.phone}`}
-                  className="text-xs text-foreground hover:text-accent"
-                >
-                  {company.phone}
-                </a>
-              ) : (
-                <span className="text-xs text-muted-foreground">—</span>
-              )}
-            </InfoRow>
           </div>
-          {company.notes && (
-            <div className="pt-3 border-t border-[var(--border)]">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
-                Notes
-              </p>
-              <p className="text-xs text-foreground whitespace-pre-wrap">
-                {company.notes}
-              </p>
-            </div>
-          )}
+          <div className="pt-3 border-t border-[var(--border)]">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+              Notes
+            </p>
+            <InlineText
+              value={company.notes}
+              onSave={patch("notes")}
+              ariaLabel="Notes"
+              variant="textarea"
+              placeholder="Ajouter des notes…"
+              displayClassName="text-xs whitespace-pre-wrap"
+              rows={5}
+            />
+          </div>
         </Card>
 
         {/* Contacts */}
@@ -372,6 +417,12 @@ export function CompanyDetailClient({
             </ul>
           )}
         </Card>
+
+        <CustomFieldsPanel
+          entityType="company"
+          entityId={company.id}
+          initialFields={customFields}
+        />
       </div>
 
       <CompanyDrawer

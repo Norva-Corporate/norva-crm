@@ -55,10 +55,49 @@ export async function createActivity(
     deal: "/dashboard/pipeline",
     project: `/dashboard/projets/${data.entity_id}`,
     invoice: `/dashboard/facturation/${data.entity_id}`,
+    lead_import: "/dashboard/leads",
   };
   revalidatePath(map[data.entity_type]);
 
   return { success: true, data: { id: inserted.id } };
+}
+
+export async function deleteActivity(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  // Fetch first to know which path to revalidate.
+  const { data: existing, error: fetchError } = await supabase
+    .from("activities")
+    .select("entity_type, entity_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !existing) {
+    return { success: false, error: "Activité introuvable." };
+  }
+
+  const { error } = await supabase.from("activities").delete().eq("id", id);
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  const entityType = existing.entity_type as ActivityEntityType;
+  const entityId = existing.entity_id as string;
+  const map: Record<ActivityEntityType, string> = {
+    contact: `/dashboard/contacts/${entityId}`,
+    company: `/dashboard/companies/${entityId}`,
+    deal: "/dashboard/pipeline",
+    project: `/dashboard/projets/${entityId}`,
+    invoice: `/dashboard/facturation/${entityId}`,
+    lead_import: "/dashboard/leads",
+  };
+  revalidatePath(map[entityType]);
+
+  return { success: true, data: null };
 }
 
 export async function getActivitiesForEntity(

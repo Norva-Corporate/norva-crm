@@ -13,6 +13,8 @@ export interface ProjectInput {
   description?: string | null;
   status?: ProjectStatus;
   deal_id?: string | null;
+  contact_id?: string | null;
+  company_id?: string | null;
   start_date?: string | null;
   end_date?: string | null;
   budget?: number | null;
@@ -24,7 +26,7 @@ export type ActionResult<T = null> =
   | { success: false; error: string };
 
 const PROJECT_SELECT =
-  "*, deal:deals(id, title, value, contact:contacts(id, first_name, last_name), company:companies(id, name)), assignee:profiles(id, full_name)";
+  "*, deal:deals(id, title, value, contact:contacts(id, first_name, last_name), company:companies(id, name)), contact:contacts!projects_contact_id_fkey(id, first_name, last_name), company:companies!projects_company_id_fkey(id, name), assignee:profiles!projects_assigned_to_fkey(id, full_name)";
 
 const VALID_STATUSES: ProjectStatus[] = [
   "en_attente",
@@ -78,6 +80,8 @@ export async function createProject(
     description: data.description,
     status,
     deal_id: data.deal_id,
+    contact_id: data.contact_id,
+    company_id: data.company_id,
     start_date: data.start_date,
     end_date: data.end_date,
     budget: data.budget ?? null,
@@ -123,6 +127,8 @@ export async function updateProject(
     description: data.description,
     status: data.status,
     deal_id: data.deal_id,
+    contact_id: data.contact_id,
+    company_id: data.company_id,
     start_date: data.start_date,
     end_date: data.end_date,
     budget: data.budget ?? null,
@@ -178,6 +184,57 @@ export async function deleteProject(id: string): Promise<ActionResult> {
     console.error("[gcal sync] deleteProject:", e)
   );
   revalidateProjects();
+  return { success: true, data: null };
+}
+
+// ============================================================
+// PATCH — partial update for inline editing
+// ============================================================
+export type ProjectPatch = Partial<{
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  deal_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  budget: number | null;
+  assigned_to: string | null;
+}>;
+
+export async function patchProject(
+  id: string,
+  patch: ProjectPatch
+): Promise<ActionResult> {
+  if (
+    "name" in patch &&
+    (typeof patch.name !== "string" || !patch.name.trim())
+  ) {
+    return { success: false, error: "Le nom est obligatoire." };
+  }
+  if (patch.status && !VALID_STATUSES.includes(patch.status)) {
+    return { success: false, error: "Statut invalide." };
+  }
+
+  const payload: Record<string, unknown> = {};
+  for (const k of Object.keys(patch) as (keyof ProjectPatch)[]) {
+    const v = patch[k];
+    if (k === "name") {
+      payload[k] = (v as string).trim();
+    } else {
+      payload[k] = v === "" ? null : v;
+    }
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("projects").update(payload).eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  void syncEntityToAllConnectedUsers("project", id).catch((e) =>
+    console.error("[gcal sync] patchProject:", e)
+  );
+  revalidateProjects(id);
   return { success: true, data: null };
 }
 
