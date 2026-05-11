@@ -355,6 +355,34 @@ export function LeadDrawer({
               </FieldRow>
             </Section>
 
+            <Section title="Entreprise">
+              <FieldRow label="Nom de l'entreprise">
+                <InlineText
+                  value={lead.company_name}
+                  onSave={saveText("company_name")}
+                  ariaLabel="Nom de l'entreprise"
+                  placeholder="—"
+                />
+              </FieldRow>
+              <FieldRow label="Domaine">
+                <InlineText
+                  value={lead.company_domain}
+                  onSave={saveText("company_domain")}
+                  ariaLabel="Domaine"
+                  placeholder="acme.com"
+                />
+              </FieldRow>
+              {lead.existing_company_id && lead.existing_company_name && (
+                <p className="text-[11px] text-accent px-1 py-1">
+                  ✓ Une entreprise{" "}
+                  <span className="font-medium">
+                    {lead.existing_company_name}
+                  </span>{" "}
+                  existe déjà en base — elle sera associée à la conversion.
+                </p>
+              )}
+            </Section>
+
             <Section title="Qualification">
               <FieldRow label="Assigné à">
                 <InlinePicker
