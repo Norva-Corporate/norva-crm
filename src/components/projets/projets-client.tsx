@@ -149,7 +149,7 @@ export function ProjetsClient({
         action={{ label: "Nouveau projet", onClick: openCreate }}
       />
 
-      <div className="flex-1 p-6 animate-fade-in space-y-4">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-4">
         {/* KPI cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPI label="Projets actifs" value={stats.actifs} />
@@ -159,8 +159,8 @@ export function ProjetsClient({
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Rechercher un projet…"
@@ -190,8 +190,111 @@ export function ProjetsClient({
           </span>
         </div>
 
-        {/* Table */}
-        <Card className="overflow-hidden">
+        {/* Mobile : liste de cartes */}
+        <div className="md:hidden space-y-2">
+          {filtered.length === 0 ? (
+            <Card className="px-4 py-12 text-center text-sm text-muted-foreground">
+              Aucun projet.{" "}
+              <button onClick={openCreate} className="text-accent hover:underline">
+                Créer le premier
+              </button>
+            </Card>
+          ) : (
+            filtered.map((project) => {
+              const sc = STATUS_CONFIG[project.status];
+              const contact = project.contact ?? project.deal?.contact;
+              const company = project.company ?? project.deal?.company;
+              return (
+                <Card
+                  key={project.id}
+                  onClick={() => router.push(`/dashboard/projets/${project.id}`)}
+                  className="p-3 cursor-pointer hover:border-accent/30 transition-colors"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-foreground line-clamp-2">
+                          {project.name}
+                        </p>
+                        <Badge variant={sc.variant} className="shrink-0 text-[10px]">
+                          {sc.label}
+                        </Badge>
+                      </div>
+                      <div className="space-y-0.5 mt-1 text-[11px] text-muted-foreground">
+                        {(contact || company) && (
+                          <p className="truncate">
+                            {contact
+                              ? `${contact.first_name} ${contact.last_name}`
+                              : ""}
+                            {contact && company ? " · " : ""}
+                            {company?.name ?? ""}
+                          </p>
+                        )}
+                        {project.deal?.title && (
+                          <p className="truncate">Deal : {project.deal.title}</p>
+                        )}
+                        {project.assignee?.full_name && (
+                          <p className="truncate">
+                            Owner : {project.assignee.full_name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-1.5">
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {project.end_date
+                            ? `→ ${formatDate(project.end_date)}`
+                            : ""}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1 w-16 bg-[var(--muted)] rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${sc.progress}%`,
+                                backgroundColor: sc.color,
+                              }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            {sc.progress}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(project)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setDeleting(project)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </Card>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop : tableau */}
+        <Card className="hidden md:block overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

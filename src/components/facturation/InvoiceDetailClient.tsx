@@ -247,7 +247,8 @@ export function InvoiceDetailClient({
 
             {/* Lines */}
             <div>
-              <table className="w-full text-xs">
+              <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-xs min-w-[460px] px-2">
                 <thead>
                   <tr className="border-b-2 border-[#0B1220]">
                     <th className="text-left py-2 font-medium">Description</th>
@@ -281,10 +282,11 @@ export function InvoiceDetailClient({
                   )}
                 </tbody>
               </table>
+              </div>
 
               {/* Totals */}
               <div className="mt-4 flex justify-end">
-                <div className="w-64 space-y-1 text-xs">
+                <div className="w-full sm:w-64 space-y-1 text-xs">
                   <div className="flex justify-between">
                     <span className="text-[#6B7280]">Sous-total HT</span>
                     <span className="font-mono">
@@ -337,9 +339,9 @@ export function InvoiceDetailClient({
       {/* Floating bottom action bar (hidden on print) */}
       <div
         className={cn(
-          "no-print fixed bottom-0 left-56 right-0 z-30",
+          "no-print fixed bottom-0 left-0 md:left-56 right-0 z-30",
           "bg-[var(--card)] border-t border-[var(--border)]",
-          "px-6 py-3 flex items-center gap-2 flex-wrap"
+          "px-3 md:px-6 py-3 flex items-center gap-2 flex-wrap"
         )}
       >
         {error && (

@@ -74,7 +74,7 @@ export function ProfilClient({ profile, teamMembers }: Props) {
   return (
     <>
       <Header title="Profil" />
-      <div className="flex-1 p-6 space-y-6 animate-fade-in max-w-2xl">
+      <div className="flex-1 p-4 md:p-6 space-y-6 animate-fade-in max-w-2xl">
         {/* Profile */}
         <Card>
           <CardHeader>

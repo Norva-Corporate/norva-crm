@@ -69,7 +69,7 @@ export function CustomFieldsSettingsClient({
   }
 
   return (
-    <div className="flex-1 p-6 animate-fade-in space-y-6 max-w-4xl">
+    <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-6 max-w-4xl">
       <div className="space-y-1">
         <h1 className="text-xl font-semibold text-foreground">
           Champs personnalisés

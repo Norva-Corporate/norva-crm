@@ -214,7 +214,7 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
         action={{ label: "Nouvelle tâche", onClick: openCreate }}
       />
 
-      <div className="flex-1 p-6 animate-fade-in space-y-4">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-4">
         {/* KPI */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPI label="Ouvertes" value={stats.open} />
@@ -224,8 +224,8 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Rechercher…"
@@ -328,7 +328,7 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
                     </button>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-2 md:gap-3 flex-wrap">
                         <div className="min-w-0 flex-1 flex items-center gap-2">
                           {t.relatedProject && (
                             <span

@@ -99,10 +99,10 @@ export function ContactsClient({ initialContacts, companies }: Props) {
         action={{ label: "Nouveau contact", onClick: openCreate }}
       />
 
-      <div className="flex-1 p-6 animate-fade-in">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Rechercher un contact…"
@@ -119,8 +119,88 @@ export function ContactsClient({ initialContacts, companies }: Props) {
           </span>
         </div>
 
-        {/* Tableau */}
-        <Card className="overflow-hidden">
+        {/* Mobile : liste de cartes */}
+        <div className="md:hidden space-y-2">
+          {paginated.length === 0 ? (
+            <Card className="px-4 py-12 text-center text-sm text-muted-foreground">
+              <UserPlus className="h-6 w-6 mx-auto mb-2 text-muted-foreground/60" />
+              Aucun contact trouvé.{" "}
+              <button onClick={openCreate} className="text-accent hover:underline">
+                Créer le premier
+              </button>
+            </Card>
+          ) : (
+            paginated.map((contact) => (
+              <Card key={contact.id} className="p-3">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarFallback className="text-xs bg-accent/15 text-accent">
+                      {getInitials(`${contact.first_name} ${contact.last_name}`)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/dashboard/contacts/${contact.id}`}
+                      className="block"
+                    >
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {contact.first_name} {contact.last_name}
+                      </p>
+                      {contact.role && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {contact.role}
+                        </p>
+                      )}
+                      <div className="space-y-0.5 mt-1.5 text-[11px] text-muted-foreground">
+                        {contact.company && (
+                          <p className="inline-flex items-center gap-1 truncate w-full">
+                            <Building2 className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{contact.company.name}</span>
+                          </p>
+                        )}
+                        {contact.email && (
+                          <p className="inline-flex items-center gap-1 truncate w-full">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{contact.email}</span>
+                          </p>
+                        )}
+                        {contact.phone && (
+                          <p className="inline-flex items-center gap-1">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            {contact.phone}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" className="shrink-0">
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEdit(contact)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setDeleting(contact)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Desktop : tableau */}
+        <Card className="hidden md:block overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -254,39 +334,42 @@ export function ContactsClient({ initialContacts, companies }: Props) {
               </tbody>
             </table>
           </div>
+        </Card>
 
-          {/* Pagination */}
-          {filtered.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border)] bg-[var(--surface)]">
-              <p className="text-xs text-muted-foreground">
-                Page {safePage} sur {totalPages} —{" "}
-                {(safePage - 1) * PAGE_SIZE + 1}-
+        {/* Pagination — partagée mobile + desktop */}
+        {filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-2 px-3 md:px-4 py-3 mt-2 border border-[var(--border)] bg-[var(--surface)]">
+            <p className="text-[11px] md:text-xs text-muted-foreground">
+              <span className="hidden sm:inline">Page </span>
+              {safePage}/{totalPages}
+              <span className="hidden sm:inline">
+                {" "}— {(safePage - 1) * PAGE_SIZE + 1}-
                 {Math.min(safePage * PAGE_SIZE, filtered.length)} sur{" "}
                 {filtered.length}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage === 1}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() =>
-                    setPage((p) => Math.min(totalPages, p + 1))
-                  }
-                  disabled={safePage === totalPages}
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              </span>
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={() =>
+                  setPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={safePage === totalPages}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
             </div>
-          )}
-        </Card>
+          </div>
+        )}
       </div>
 
       <ContactDrawer

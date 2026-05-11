@@ -237,7 +237,7 @@ export function ProjectDetailClient({
 
   return (
     <>
-      <div className="flex-1 p-6 animate-fade-in space-y-4">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-4">
         {/* Top nav */}
         <Link
           href="/dashboard/projets"
@@ -633,7 +633,7 @@ export function ProjectDetailClient({
                 </table>
               </div>
 
-              <div className="flex items-center justify-end gap-6 pt-2 border-t border-[var(--border)] text-xs">
+              <div className="flex items-center justify-end gap-3 md:gap-6 pt-2 border-t border-[var(--border)] text-xs flex-wrap">
                 <div>
                   <span className="text-muted-foreground">Total facturé : </span>
                   <span className="text-foreground font-mono font-medium">

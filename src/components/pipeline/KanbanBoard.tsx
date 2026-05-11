@@ -21,6 +21,7 @@ import { DealCard } from "./DealCard";
 import { STAGES } from "./stages";
 import { cn, formatCurrency } from "@/lib/utils";
 import { updateDealStage } from "@/lib/actions/deals";
+import { useIsMobile } from "@/hooks/use-media-query";
 import type { DealStage, DealWithRelations } from "@/types";
 
 interface KanbanBoardProps {
@@ -38,13 +39,12 @@ export function KanbanBoard({
   onOpenDeal,
   onCreateInStage,
 }: KanbanBoardProps) {
+  const isMobile = useIsMobile();
   const [activeDeal, setActiveDeal] = useState<DealWithRelations | null>(null);
-  // Snapshot pour rollback en cas d'erreur Supabase
   const snapshotRef = useRef<DealWithRelations[] | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      // Petit délai/distance pour ne pas hijack les clicks sur la card
       activationConstraint: { distance: 4 },
     })
   );
@@ -93,7 +93,6 @@ export function KanbanBoard({
     const dealId = String(active.id);
     const overId = String(over.id);
 
-    // overId peut être un stage (id de colonne) OU un id de deal (si on hover une card)
     let targetStage: DealStage | null = null;
     if (
       (
@@ -112,7 +111,6 @@ export function KanbanBoard({
       return;
     }
 
-    // Optimistic update
     const finalStage = targetStage;
     onDealsChange((prev) =>
       prev.map((d) => (d.id === dealId ? { ...d, stage: finalStage } : d))
@@ -120,11 +118,75 @@ export function KanbanBoard({
 
     const result = await updateDealStage(dealId, finalStage);
     if (!result.success && snapshotRef.current) {
-      // Rollback
       const snap = snapshotRef.current;
       onDealsChange(() => snap);
     }
     snapshotRef.current = null;
+  }
+
+  function handleMobileStageChanged(dealId: string, newStage: DealStage) {
+    onDealsChange((prev) =>
+      prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d))
+    );
+  }
+
+  // Mode mobile : liste verticale groupée par stage, pas de dnd
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {STAGES.map((stage) => {
+          const items = dealsByStage[stage.key];
+          const stageTotal = items.reduce(
+            (sum, d) => sum + (d.value ?? 0),
+            0
+          );
+          return (
+            <section key={stage.key} className="space-y-2">
+              <header
+                className="px-3 py-2 bg-[#111927] border border-[var(--border)] flex items-center justify-between gap-2"
+                style={{ borderTop: `2px solid ${stage.accent}` }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <h3
+                    className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
+                    style={{ color: stage.accent }}
+                  >
+                    {stage.label}
+                  </h3>
+                  <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                    {items.length}
+                  </span>
+                </div>
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums shrink-0">
+                  {stageTotal > 0 ? formatCurrency(stageTotal) : "—"}
+                </span>
+              </header>
+              <div className="space-y-2">
+                {items.map((deal) => (
+                  <DealCard
+                    key={deal.id}
+                    deal={deal}
+                    onOpen={onOpenDeal}
+                    mobile
+                    onStageChanged={(newStage) =>
+                      handleMobileStageChanged(deal.id, newStage)
+                    }
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => onCreateInStage(stage.key)}
+                  className="w-full py-2 text-[11px] text-muted-foreground hover:text-accent border border-dashed border-[var(--border)] hover:border-accent/40 transition-colors inline-flex items-center justify-center gap-1"
+                >
+                  <Plus className="h-3 w-3" />
+                  Ajouter un deal
+                </button>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    );
   }
 
   return (
@@ -209,7 +271,6 @@ function Column({
       ref={setNodeRef}
       className={cn(
         "w-72 shrink-0 flex flex-col bg-[#111927] border border-[var(--border)] transition-colors",
-        // Max height pour scroll vertical interne
         "max-h-[calc(100vh-12rem)]",
         isOver && "border-accent/40 bg-[#111927]/90"
       )}

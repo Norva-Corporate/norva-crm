@@ -231,9 +231,9 @@ export default async function DashboardPage() {
     <div className="flex flex-col flex-1">
       <Header title="Tableau de bord" />
 
-      <div className="flex-1 p-6 space-y-6 animate-fade-in">
+      <div className="flex-1 p-4 md:p-6 space-y-6 animate-fade-in">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">
+          <h2 className="text-lg md:text-xl font-semibold text-foreground">
             Bonjour {firstName}
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
@@ -242,7 +242,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPI Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (

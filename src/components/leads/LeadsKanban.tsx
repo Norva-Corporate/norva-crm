@@ -20,6 +20,7 @@ import { LeadCard } from "./LeadCard";
 import { LEAD_STAGES, LEAD_STAGE_KEYS } from "./stages";
 import { cn } from "@/lib/utils";
 import { updateLeadStage } from "@/lib/actions/leads";
+import { useIsMobile } from "@/hooks/use-media-query";
 import type {
   LeadPipelineStage,
   LeadWithDedup,
@@ -38,6 +39,7 @@ export function LeadsKanban({
   onLeadsChange,
   onOpenLead,
 }: LeadsKanbanProps) {
+  const isMobile = useIsMobile();
   const [activeLead, setActiveLead] = useState<LeadWithDedup | null>(null);
   const snapshotRef = useRef<LeadWithDedup[] | null>(null);
 
@@ -90,7 +92,6 @@ export function LeadsKanban({
     const leadId = String(active.id);
     const overId = String(over.id);
 
-    // overId peut être un stage (colonne) OU un id de lead (card)
     let targetStage: LeadPipelineStage | null = null;
     if (LEAD_STAGE_KEYS.includes(overId as LeadPipelineStage)) {
       targetStage = overId as LeadPipelineStage;
@@ -109,7 +110,6 @@ export function LeadsKanban({
       return;
     }
 
-    // Optimistic
     const finalStage = targetStage;
     onLeadsChange((prev) =>
       prev.map((l) =>
@@ -123,6 +123,67 @@ export function LeadsKanban({
       onLeadsChange(() => snap);
     }
     snapshotRef.current = null;
+  }
+
+  function handleMobileStageChanged(leadId: string, newStage: LeadPipelineStage) {
+    onLeadsChange((prev) =>
+      prev.map((l) =>
+        l.id === leadId ? { ...l, pipeline_stage: newStage } : l
+      )
+    );
+  }
+
+  // Mode mobile : liste verticale groupée par stage, pas de dnd
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {LEAD_STAGES.map((stage) => {
+          const items = leadsByStage[stage.key];
+          return (
+            <section key={stage.key} className="space-y-2">
+              <header
+                className="px-3 py-2 bg-[#111927] border border-[var(--border)] flex items-center justify-between"
+                style={{ borderTop: `2px solid ${stage.accent}` }}
+              >
+                <div className="min-w-0">
+                  <h3
+                    className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
+                    style={{ color: stage.accent }}
+                  >
+                    {stage.label}
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground/70 truncate">
+                    {stage.description}
+                  </p>
+                </div>
+                <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 ml-2">
+                  {items.length}
+                </span>
+              </header>
+              {items.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground/50 text-center py-3 italic">
+                  Aucun lead
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((lead) => (
+                    <LeadCard
+                      key={lead.id}
+                      lead={lead}
+                      onOpen={onOpenLead}
+                      mobile
+                      onStageChanged={(stage) =>
+                        handleMobileStageChanged(lead.id, stage)
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    );
   }
 
   return (

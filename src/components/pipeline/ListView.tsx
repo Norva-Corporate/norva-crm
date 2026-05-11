@@ -87,8 +87,94 @@ export function ListView({ deals, onOpenDeal, onDeleteDeal }: ListViewProps) {
         })}
       </div>
 
-      {/* Table */}
-      <Card className="overflow-hidden">
+      {/* Mobile : liste de cartes */}
+      <div className="md:hidden space-y-2">
+        {sorted.length === 0 ? (
+          <Card className="px-4 py-12 text-center text-sm text-muted-foreground">
+            Aucun deal dans cette vue.
+          </Card>
+        ) : (
+          sorted.map((deal) => {
+            const stageDef = getStage(deal.stage);
+            return (
+              <Card
+                key={deal.id}
+                onClick={() => onOpenDeal(deal)}
+                className="p-3 cursor-pointer hover:border-accent/30 transition-colors"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground line-clamp-2">
+                        {deal.title}
+                      </p>
+                      <Badge
+                        variant={stageDef.badgeVariant}
+                        className="shrink-0 text-[10px]"
+                      >
+                        {stageDef.label}
+                      </Badge>
+                    </div>
+                    <div className="space-y-0.5 mt-1 text-[11px] text-muted-foreground">
+                      {deal.contact && (
+                        <p className="truncate">
+                          {deal.contact.first_name} {deal.contact.last_name}
+                        </p>
+                      )}
+                      {deal.company?.name && (
+                        <p className="truncate">{deal.company.name}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-1.5">
+                      <span className="text-sm font-mono font-semibold text-foreground tabular-nums">
+                        {deal.value != null
+                          ? formatCurrency(deal.value)
+                          : "—"}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatDate(deal.expected_close_date)}
+                      </span>
+                    </div>
+                    {deal.assignee?.full_name && (
+                      <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                        Owner : {deal.assignee.full_name}
+                      </p>
+                    )}
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onOpenDeal(deal)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onDeleteDeal(deal)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop : tableau */}
+      <Card className="hidden md:block overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

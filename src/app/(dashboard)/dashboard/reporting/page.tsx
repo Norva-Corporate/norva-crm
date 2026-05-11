@@ -73,7 +73,7 @@ export default async function ReportingPage() {
     <div className="flex flex-col flex-1">
       <Header title="Reporting" />
 
-      <div className="flex-1 p-6 space-y-6 animate-fade-in">
+      <div className="flex-1 p-4 md:p-6 space-y-6 animate-fade-in">
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {kpis.map((k) => {

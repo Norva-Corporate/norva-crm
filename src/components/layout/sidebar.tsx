@@ -55,9 +55,17 @@ interface SidebarProps {
   profile: Profile | null;
   collapsed: boolean;
   onToggle: () => void;
+  variant?: "desktop" | "mobile";
+  onNavigate?: () => void;
 }
 
-export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
+export function Sidebar({
+  profile,
+  collapsed,
+  onToggle,
+  variant = "desktop",
+  onNavigate,
+}: SidebarProps) {
   const pathname = usePathname();
   const isProfilActive = pathname.startsWith("/dashboard/profil");
   const discussionUnread = useDiscussionUnreadTotal();
@@ -65,41 +73,52 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
     discussion: discussionUnread,
   };
 
+  const isMobile = variant === "mobile";
+  const effectiveCollapsed = isMobile ? false : collapsed;
+
   return (
     <aside
       className={cn(
-        "flex h-screen flex-col bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40 transition-[width] duration-200",
-        collapsed ? "w-16" : "w-56"
+        "flex h-screen flex-col bg-[var(--sidebar)] transition-[width] duration-200",
+        isMobile
+          ? "w-full h-full"
+          : [
+              "border-r border-[var(--sidebar-border)] fixed left-0 top-0 z-40",
+              effectiveCollapsed ? "w-16" : "w-56",
+            ]
       )}
     >
       {/* Logo + toggle */}
       <div
         className={cn(
           "flex items-center h-14 border-b border-[var(--sidebar-border)]",
-          collapsed ? "justify-center px-0" : "justify-between px-4"
+          effectiveCollapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
-        {!collapsed && (
+        {!effectiveCollapsed && (
           <Link
             href="/dashboard"
+            onClick={onNavigate}
             className="text-base font-semibold text-foreground tracking-tight"
           >
             norva<span className="text-accent">.</span>
           </Link>
         )}
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-[var(--sidebar-muted)] hover:text-foreground transition-colors"
-          title={collapsed ? "Déplier la sidebar" : "Replier la sidebar"}
-          aria-label={collapsed ? "Déplier la sidebar" : "Replier la sidebar"}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-        </button>
+        {!isMobile && (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="text-[var(--sidebar-muted)] hover:text-foreground transition-colors"
+            title={effectiveCollapsed ? "Déplier la sidebar" : "Replier la sidebar"}
+            aria-label={effectiveCollapsed ? "Déplier la sidebar" : "Replier la sidebar"}
+          >
+            {effectiveCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -117,10 +136,11 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              title={collapsed ? item.label : undefined}
+              onClick={onNavigate}
+              title={effectiveCollapsed ? item.label : undefined}
               className={cn(
                 "relative flex items-center h-9 text-sm transition-colors group",
-                collapsed ? "justify-center" : "gap-2.5 px-2.5",
+                effectiveCollapsed ? "justify-center" : "gap-2.5 px-2.5",
                 isActive
                   ? "bg-accent/15 text-accent"
                   : "text-[var(--sidebar-muted)] hover:text-foreground hover:bg-white/5"
@@ -134,9 +154,9 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
                     : "text-[var(--sidebar-muted)] group-hover:text-foreground"
                 )}
               />
-              {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+              {!effectiveCollapsed && <span className="flex-1 truncate">{item.label}</span>}
               {badge > 0 &&
-                (collapsed ? (
+                (effectiveCollapsed ? (
                   <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent" />
                 ) : (
                   <span className="ml-auto min-w-[18px] h-[18px] px-1.5 flex items-center justify-center text-[10px] font-semibold bg-accent text-white rounded-full">
@@ -152,23 +172,24 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
       <div className="border-t border-[var(--sidebar-border)] p-2 space-y-1">
         <Link
           href="/dashboard/profil"
-          title={collapsed ? "Profil" : undefined}
+          onClick={onNavigate}
+          title={effectiveCollapsed ? "Profil" : undefined}
           className={cn(
             "flex items-center h-9 text-sm transition-colors",
-            collapsed ? "justify-center" : "gap-2.5 px-2.5",
+            effectiveCollapsed ? "justify-center" : "gap-2.5 px-2.5",
             isProfilActive
               ? "bg-accent/15 text-accent"
               : "text-[var(--sidebar-muted)] hover:text-foreground hover:bg-white/5"
           )}
         >
           <UserCircle className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Profil</span>}
+          {!effectiveCollapsed && <span>Profil</span>}
         </Link>
 
         <div
           className={cn(
             "flex items-center mt-1 pt-2 border-t border-[var(--sidebar-border)]",
-            collapsed ? "flex-col gap-2 py-2" : "gap-2.5 px-1 py-2"
+            effectiveCollapsed ? "flex-col gap-2 py-2" : "gap-2.5 px-1 py-2"
           )}
         >
           <Avatar className="h-7 w-7 shrink-0">
@@ -178,7 +199,7 @@ export function Sidebar({ profile, collapsed, onToggle }: SidebarProps) {
             </AvatarFallback>
           </Avatar>
 
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-foreground truncate">
                 {profile?.full_name ?? profile?.email ?? "Utilisateur"}

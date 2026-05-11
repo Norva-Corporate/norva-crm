@@ -131,30 +131,30 @@ export function PipelineClient({
 
       <div className="flex-1 flex flex-col animate-fade-in min-h-0">
         {/* Toolbar */}
-        <div className="px-6 pt-5 pb-4 flex items-center gap-4 flex-wrap">
+        <div className="px-4 md:px-6 pt-4 md:pt-5 pb-4 flex items-center gap-3 md:gap-4 flex-wrap">
           {/* Total pipeline */}
-          <div className="flex items-baseline gap-3 mr-auto">
+          <div className="flex items-baseline gap-2 md:gap-3 mr-auto">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                 Pipeline ouvert
               </p>
-              <p className="font-mono text-2xl font-semibold text-foreground tabular-nums leading-tight">
+              <p className="font-mono text-xl md:text-2xl font-semibold text-foreground tabular-nums leading-tight">
                 {formatCurrency(totalOpen)}
               </p>
             </div>
-            <div className="border-l border-[var(--border)] pl-3">
+            <div className="border-l border-[var(--border)] pl-2 md:pl-3">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                 Gagné
               </p>
-              <p className="font-mono text-base text-[#4ADE80] tabular-nums leading-tight">
+              <p className="font-mono text-sm md:text-base text-[#4ADE80] tabular-nums leading-tight">
                 {formatCurrency(totalWon)}
               </p>
             </div>
-            <div className="border-l border-[var(--border)] pl-3">
+            <div className="border-l border-[var(--border)] pl-2 md:pl-3">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                 Deals
               </p>
-              <p className="font-mono text-base text-foreground tabular-nums leading-tight">
+              <p className="font-mono text-sm md:text-base text-foreground tabular-nums leading-tight">
                 {deals.length}
               </p>
             </div>
@@ -180,7 +180,7 @@ export function PipelineClient({
         {/* Vue */}
         <div className="flex-1 min-h-0">
           {view === "kanban" ? (
-            <div className="h-full overflow-x-auto px-6 pb-6">
+            <div className="h-full md:overflow-x-auto px-4 md:px-6 pb-6">
               <KanbanBoard
                 deals={deals}
                 onDealsChange={(updater) => setDeals((prev) => updater(prev))}
@@ -189,7 +189,7 @@ export function PipelineClient({
               />
             </div>
           ) : (
-            <div className="px-6 pb-6">
+            <div className="px-4 md:px-6 pb-6">
               <ListView
                 deals={deals}
                 onOpenDeal={openEdit}

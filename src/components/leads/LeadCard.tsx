@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import {
+  LEAD_STAGES,
   getLeadStage,
   getQualityLevel,
   isRecommendedForContact,
@@ -36,14 +37,18 @@ import {
   STAGNATION_COLOR,
 } from "./stages";
 import { AgentButton } from "@/components/agents/agent-button";
-import { convertLeadToDeal } from "@/lib/actions/leads";
-import type { LeadWithDedup } from "@/lib/actions/leads";
+import { convertLeadToDeal, updateLeadStage } from "@/lib/actions/leads";
+import type { LeadPipelineStage, LeadWithDedup } from "@/lib/actions/leads";
 
 interface LeadCardProps {
   lead: LeadWithDedup;
   onOpen: (lead: LeadWithDedup) => void;
   /** Pour le DragOverlay : rend la card sans le hook sortable */
   overlay?: boolean;
+  /** Mode mobile : pas de drag handle, affiche un select de stage */
+  mobile?: boolean;
+  /** Callback appelé après changement de stage (en mode mobile) */
+  onStageChanged?: (newStage: LeadPipelineStage) => void;
 }
 
 // Les stages où on propose des actions agent / conversion
@@ -53,11 +58,17 @@ const ACTION_STAGES: LeadWithDedup["pipeline_stage"][] = [
   "in_discussion",
 ];
 
-export function LeadCard({ lead, onOpen, overlay = false }: LeadCardProps) {
+export function LeadCard({
+  lead,
+  onOpen,
+  overlay = false,
+  mobile = false,
+  onStageChanged,
+}: LeadCardProps) {
   const sortable = useSortable({
     id: lead.id,
     data: { type: "lead", stage: lead.pipeline_stage },
-    disabled: overlay,
+    disabled: overlay || mobile,
   });
 
   const {
@@ -69,12 +80,28 @@ export function LeadCard({ lead, onOpen, overlay = false }: LeadCardProps) {
     isDragging,
   } = sortable;
 
-  const style: React.CSSProperties = overlay
+  const style: React.CSSProperties = overlay || mobile
     ? {}
     : {
         transform: CSS.Translate.toString(transform),
         transition,
       };
+
+  const [stagePending, startStageTransition] = useTransition();
+
+  function handleStageChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    e.stopPropagation();
+    const newStage = e.target.value as LeadPipelineStage;
+    if (newStage === lead.pipeline_stage) return;
+    startStageTransition(async () => {
+      const res = await updateLeadStage(lead.id, newStage);
+      if (!res.success) {
+        toast.error("Impossible de changer le stage");
+        return;
+      }
+      onStageChanged?.(newStage);
+    });
+  }
 
   const stageDef = getLeadStage(lead.pipeline_stage);
   const accentBorder = stageDef.accent;
@@ -104,7 +131,7 @@ export function LeadCard({ lead, onOpen, overlay = false }: LeadCardProps) {
 
   return (
     <div
-      ref={overlay ? undefined : setNodeRef}
+      ref={overlay || mobile ? undefined : setNodeRef}
       style={style}
       className={cn(
         "group relative bg-[#1C2A44] border border-[var(--border)] border-l-2 p-3 cursor-pointer transition-all",
@@ -123,21 +150,23 @@ export function LeadCard({ lead, onOpen, overlay = false }: LeadCardProps) {
       />
 
       <div className="flex items-start gap-2">
-        {/* Drag handle */}
-        <button
-          type="button"
-          aria-label="Déplacer"
-          className={cn(
-            "shrink-0 mt-0.5 -ml-1 text-muted-foreground/60 hover:text-foreground",
-            "cursor-grab active:cursor-grabbing transition-colors",
-            "opacity-50 group-hover:opacity-100"
-          )}
-          onClick={(e) => e.stopPropagation()}
-          {...(overlay ? {} : attributes)}
-          {...(overlay ? {} : listeners)}
-        >
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
+        {/* Drag handle — caché en mode mobile */}
+        {!mobile && (
+          <button
+            type="button"
+            aria-label="Déplacer"
+            className={cn(
+              "shrink-0 mt-0.5 -ml-1 text-muted-foreground/60 hover:text-foreground",
+              "cursor-grab active:cursor-grabbing transition-colors",
+              "opacity-50 group-hover:opacity-100"
+            )}
+            onClick={(e) => e.stopPropagation()}
+            {...(overlay ? {} : attributes)}
+            {...(overlay ? {} : listeners)}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+        )}
 
         <div className="flex-1 min-w-0 space-y-2">
           {/* Header — nom + score qualité + badge ⭐ recommandé */}
@@ -245,7 +274,7 @@ export function LeadCard({ lead, onOpen, overlay = false }: LeadCardProps) {
           {/* Actions — boutons agent + bouton conversion */}
           {(showActions || showCreateDeal) && (
             <div
-              className="flex items-center gap-1.5 pt-2 border-t border-[var(--border)]/50"
+              className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--border)]/50"
               onClick={(e) => e.stopPropagation()}
             >
               {showActions && (
@@ -281,6 +310,32 @@ export function LeadCard({ lead, onOpen, overlay = false }: LeadCardProps) {
               {showCreateDeal && (
                 <CreateDealButton leadId={lead.id} className="ml-auto" />
               )}
+            </div>
+          )}
+
+          {/* Mobile : sélecteur de stage à la place du drag */}
+          {mobile && (
+            <div
+              className="pt-2 border-t border-[var(--border)]/50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <label className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span className="shrink-0">Stage :</span>
+                <select
+                  value={lead.pipeline_stage}
+                  onChange={handleStageChange}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={stagePending}
+                  className="flex-1 h-7 px-1.5 text-[11px] bg-[var(--background)] border border-[var(--border)] text-foreground focus:outline-none focus:border-accent"
+                >
+                  {LEAD_STAGES.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                {stagePending && <Loader2 className="h-3 w-3 animate-spin" />}
+              </label>
             </div>
           )}
         </div>

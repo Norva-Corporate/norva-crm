@@ -66,7 +66,7 @@ export function DeleteModal({
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-2 space-y-2">
+        <div className="px-4 md:px-6 pb-2 space-y-2">
           <p className="text-sm text-foreground">
             Êtes-vous sûr de vouloir supprimer{" "}
             <span className="font-medium text-foreground">{itemName}</span> ?

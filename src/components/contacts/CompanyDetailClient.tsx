@@ -100,7 +100,7 @@ export function CompanyDetailClient({
     <>
       <Header title="Fiche entreprise" />
 
-      <div className="flex-1 p-6 animate-fade-in space-y-6">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-6">
         <Link
           href="/dashboard/companies"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -110,10 +110,10 @@ export function CompanyDetailClient({
         </Link>
 
         {/* En-tête */}
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="h-16 w-16 bg-accent/15 flex items-center justify-center text-lg font-semibold text-accent shrink-0">
+        <Card className="p-4 md:p-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3 md:gap-4 min-w-0 flex-1">
+              <div className="h-12 w-12 md:h-16 md:w-16 bg-accent/15 flex items-center justify-center text-base md:text-lg font-semibold text-accent shrink-0">
                 {getInitials(company.name)}
               </div>
               <div className="space-y-2 pt-1 min-w-0 flex-1">

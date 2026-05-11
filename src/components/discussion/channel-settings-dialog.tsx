@@ -93,7 +93,7 @@ export function ChannelSettingsDialog({
               Modifie le nom ou la description.
             </DialogDescription>
           </DialogHeader>
-          <div className="px-6 pb-4 space-y-4">
+          <div className="px-4 md:px-6 pb-4 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground">Nom</label>
               <Input

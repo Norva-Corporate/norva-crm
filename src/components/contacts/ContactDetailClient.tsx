@@ -109,7 +109,7 @@ export function ContactDetailClient({
     <>
       <Header title="Fiche contact" />
 
-      <div className="flex-1 p-6 animate-fade-in space-y-6">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-6">
         {/* Retour */}
         <Link
           href="/dashboard/contacts"
@@ -120,10 +120,10 @@ export function ContactDetailClient({
         </Link>
 
         {/* En-tête */}
-        <Card className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <Avatar className="h-16 w-16">
+        <Card className="p-4 md:p-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-3 md:gap-4 min-w-0 flex-1">
+              <Avatar className="h-12 w-12 md:h-16 md:w-16 shrink-0">
                 <AvatarFallback className="text-lg bg-accent/15 text-accent font-semibold">
                   {getInitials(`${contact.first_name} ${contact.last_name}`)}
                 </AvatarFallback>

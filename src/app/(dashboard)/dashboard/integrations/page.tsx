@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { CalendarDays, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { Header } from "@/components/layout/header";
 import {
   Card,
   CardContent,
@@ -60,9 +61,11 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
   const flashStatus = params.status;
 
   return (
-    <div className="space-y-6">
+    <>
+      <Header title="Intégrations" />
+      <div className="flex-1 p-4 md:p-6 space-y-6 animate-fade-in">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">Intégrations</h1>
+        <h1 className="text-lg md:text-xl font-semibold tracking-tight">Intégrations</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Connectez vos outils externes pour synchroniser les données du CRM.
         </p>
@@ -179,6 +182,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
           <IntegrationActions isConnected={isConnected} />
         </CardFooter>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }

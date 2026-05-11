@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GLOBAL_SEARCH_OPEN_EVENT } from "@/components/global-search";
 import { NotificationBell } from "@/components/notification-bell";
+import { useMobileSidebar } from "@/components/layout/mobile-sidebar-context";
 
 interface HeaderProps {
   title: string;
@@ -15,6 +16,7 @@ interface HeaderProps {
 
 export function Header({ title, action }: HeaderProps) {
   const [shortcut, setShortcut] = useState("⌘K");
+  const { setOpen } = useMobileSidebar();
 
   useEffect(() => {
     if (
@@ -30,10 +32,22 @@ export function Header({ title, action }: HeaderProps) {
   }
 
   return (
-    <header className="h-14 border-b border-[var(--border)] bg-[var(--background)] flex items-center px-6 gap-4 sticky top-0 z-30">
-      <h1 className="text-sm font-semibold text-foreground flex-shrink-0">{title}</h1>
+    <header className="h-14 border-b border-[var(--border)] bg-[var(--background)] flex items-center px-4 md:px-6 gap-2 md:gap-4 sticky top-0 z-30">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="md:hidden inline-flex items-center justify-center h-9 w-9 -ml-2 text-foreground hover:bg-white/5 rounded-sm transition-colors"
+        aria-label="Ouvrir le menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
-      <div className="flex-1 max-w-sm ml-4">
+      <h1 className="text-sm font-semibold text-foreground flex-shrink-0 truncate min-w-0">
+        {title}
+      </h1>
+
+      {/* Desktop: full search button */}
+      <div className="hidden md:flex flex-1 max-w-sm ml-4">
         <button
           type="button"
           onClick={openSearch}
@@ -47,12 +61,27 @@ export function Header({ title, action }: HeaderProps) {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-1 md:gap-2 ml-auto">
+        {/* Mobile: icon-only search */}
+        <button
+          type="button"
+          onClick={openSearch}
+          className="md:hidden inline-flex items-center justify-center h-9 w-9 text-foreground hover:bg-white/5 rounded-sm transition-colors"
+          aria-label="Rechercher"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+
         <NotificationBell />
+
         {action && (
-          <Button size="sm" onClick={action.onClick} className="h-8 text-xs gap-1.5">
+          <Button
+            size="sm"
+            onClick={action.onClick}
+            className="h-8 text-xs gap-1.5 px-2 md:px-3"
+          >
             <Plus className="h-3.5 w-3.5" />
-            {action.label}
+            <span className="hidden sm:inline">{action.label}</span>
           </Button>
         )}
       </div>

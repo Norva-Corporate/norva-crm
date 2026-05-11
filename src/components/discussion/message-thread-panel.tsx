@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useDiscussionRealtime } from "@/hooks/use-discussion-realtime";
 import {
@@ -72,18 +72,33 @@ export function MessageThreadPanel({
   });
 
   return (
-    <aside className="hidden lg:flex w-[400px] flex-col bg-[var(--card)] border-l border-[var(--border)]">
+    <aside
+      className="
+        fixed inset-0 z-40 flex flex-col bg-[var(--card)]
+        lg:relative lg:inset-auto lg:z-auto lg:w-[400px] lg:border-l lg:border-[var(--border)]
+      "
+    >
       <div className="flex items-center justify-between h-12 px-4 border-b border-[var(--border)]">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Thread</h3>
-          <p className="text-[11px] text-muted-foreground">
-            {replies.length} {replies.length > 1 ? "réponses" : "réponse"}
-          </p>
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="lg:hidden h-7 w-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--muted)] shrink-0"
+            aria-label="Retour aux messages"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-foreground truncate">Thread</h3>
+            <p className="text-[11px] text-muted-foreground">
+              {replies.length} {replies.length > 1 ? "réponses" : "réponse"}
+            </p>
+          </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="h-7 w-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--muted)]"
+          className="hidden lg:flex h-7 w-7 items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[var(--muted)]"
           aria-label="Fermer le thread"
         >
           <X className="h-4 w-4" />

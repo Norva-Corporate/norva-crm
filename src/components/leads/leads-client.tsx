@@ -191,7 +191,7 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
     <>
       <Header title="Leads" />
 
-      <div className="flex-1 p-6 animate-fade-in space-y-4">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-4">
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <KPI label="À traiter" value={counts.pending} accent="#3B7BF5" />
@@ -202,8 +202,8 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
         </div>
 
         {/* Toolbar : search + view toggle + filtres + tri + tabs (mode liste) */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="relative w-full md:w-auto md:flex-1 md:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Rechercher email, nom, entreprise…"
@@ -325,7 +325,7 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
 
         {/* Vue */}
         {view === "kanban" ? (
-          <div className="overflow-x-auto -mx-6 px-6 pb-4">
+          <div className="md:overflow-x-auto -mx-4 md:-mx-6 px-4 md:px-6 pb-4">
             {kanbanLeads.length === 0 ? (
               <Card className="px-4 py-12 text-center text-sm text-muted-foreground">
                 {leads.length === 0 ? (

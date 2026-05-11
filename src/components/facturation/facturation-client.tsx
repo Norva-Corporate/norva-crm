@@ -158,7 +158,7 @@ export function FacturationClient({
         action={{ label: "Nouveau document", onClick: openCreate }}
       />
 
-      <div className="flex-1 p-6 animate-fade-in space-y-4">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-4">
         {/* KPI cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPI label="Total facturé" value={formatCurrency(stats.totalFacture)} />
@@ -180,8 +180,8 @@ export function FacturationClient({
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Rechercher…"
@@ -224,8 +224,100 @@ export function FacturationClient({
           </div>
         </div>
 
-        {/* Table */}
-        <Card className="overflow-hidden">
+        {/* Mobile : liste de cartes */}
+        <div className="md:hidden space-y-2">
+          {filtered.length === 0 ? (
+            <Card className="px-4 py-12 text-center text-sm text-muted-foreground">
+              <FileText className="h-6 w-6 mx-auto mb-2 text-muted-foreground/60" />
+              Aucun document.{" "}
+              <button onClick={openCreate} className="text-accent hover:underline">
+                Créer le premier
+              </button>
+            </Card>
+          ) : (
+            filtered.map((inv) => {
+              const sc = STATUS_CONFIG[inv.effective_status];
+              const clientLabel = inv.contact
+                ? `${inv.contact.first_name} ${inv.contact.last_name}`
+                : inv.company?.name ?? "—";
+              return (
+                <Card
+                  key={inv.id}
+                  onClick={() =>
+                    router.push(`/dashboard/facturation/${inv.id}`)
+                  }
+                  className={cn(
+                    "p-3 cursor-pointer hover:border-accent/30 transition-colors",
+                    inv.effective_status === "annulee" && "opacity-50"
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-accent mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-mono text-foreground">
+                          {inv.number}
+                        </span>
+                        {inv.type === "quote" && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-[var(--muted)] text-muted-foreground rounded-sm">
+                            DEVIS
+                          </span>
+                        )}
+                        <Badge variant={sc.variant} className="text-[10px]">
+                          {sc.label}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-foreground mt-1 truncate">
+                        {clientLabel}
+                      </p>
+                      {inv.project?.name && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {inv.project.name}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between gap-2 mt-1.5">
+                        <span className="text-sm font-semibold text-foreground font-mono">
+                          {formatCurrency(inv.total ?? 0)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {formatDate(inv.due_date)}
+                        </span>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(inv)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setDeleting(inv)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </Card>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop : tableau */}
+        <Card className="hidden md:block overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

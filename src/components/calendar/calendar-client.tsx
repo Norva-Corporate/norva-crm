@@ -131,9 +131,9 @@ export function CalendarClient({ year, month, events }: Props) {
   return (
     <>
       <Header title="Calendrier" />
-      <div className="flex-1 p-6 animate-fade-in space-y-4">
+      <div className="flex-1 p-4 md:p-6 animate-fade-in space-y-4">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <div className="flex items-center gap-1">
             <Button
               size="icon-sm"
@@ -191,6 +191,8 @@ export function CalendarClient({ year, month, events }: Props) {
 
         {/* Calendar grid */}
         <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
           <div className="grid grid-cols-7 border-b border-[var(--border)] bg-[var(--surface)]">
             {WEEK_DAYS.map((d) => (
               <div
@@ -209,7 +211,7 @@ export function CalendarClient({ year, month, events }: Props) {
                 <div
                   key={iso}
                   className={cn(
-                    "border-b border-r border-[var(--border)] p-1.5 min-h-[110px] flex flex-col gap-1",
+                    "border-b border-r border-[var(--border)] p-1.5 min-h-[90px] md:min-h-[110px] flex flex-col gap-1",
                     !inMonth && "bg-[var(--surface)]/40"
                   )}
                 >
@@ -253,6 +255,8 @@ export function CalendarClient({ year, month, events }: Props) {
                 </div>
               );
             })}
+          </div>
+          </div>
           </div>
         </Card>
 
