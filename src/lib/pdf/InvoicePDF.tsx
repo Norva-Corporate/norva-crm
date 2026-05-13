@@ -7,6 +7,19 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 
+// ── Branding émetteur (norva.) ──────────────────────────────────
+// Si tu déclares un SIRET ou autres mentions légales, modifie ici.
+const ISSUER = {
+  name: "norva.",
+  email: "norvagroupe@gmail.com",
+  website: "norva-corporate.fr",
+  // Laisser vide pour masquer la ligne SIRET (sinon : "123 456 789 00001")
+  siret: "",
+  // Régime TVA — utilisé dans la mention légale en bas de facture
+  vatRegime:
+    "TVA non applicable, art. 293 B du CGI (à adapter selon votre régime).",
+} as const;
+
 interface InvoicePDFProps {
   invoice: {
     number: string;
@@ -189,7 +202,7 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
   return (
     <Document
       title={`${isQuote ? "Devis" : "Facture"} ${invoice.number}`}
-      author="norva. — Agence Prime"
+      author={ISSUER.name}
     >
       <Page size="A4" style={styles.page}>
         {/* Header */}
@@ -197,8 +210,8 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
           <View style={styles.brandRow}>
             <Text style={styles.brandSquare}>N</Text>
             <View>
-              <Text style={styles.brandName}>norva.</Text>
-              <Text style={styles.brandSub}>Agence Prime</Text>
+              <Text style={styles.brandName}>{ISSUER.name}</Text>
+              <Text style={styles.brandSub}>{ISSUER.website}</Text>
             </View>
           </View>
           <View style={styles.docMeta}>
@@ -212,13 +225,18 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
           <View style={styles.partyBlock}>
             <Text style={styles.partyLabel}>Émetteur</Text>
             <Text style={[styles.partyLine, styles.partyName]}>
-              norva. — Agence Prime
+              {ISSUER.name}
+            </Text>
+            {ISSUER.siret && (
+              <Text style={[styles.partyLine, styles.partyMuted]}>
+                SIRET : {ISSUER.siret}
+              </Text>
+            )}
+            <Text style={[styles.partyLine, styles.partyMuted]}>
+              {ISSUER.email}
             </Text>
             <Text style={[styles.partyLine, styles.partyMuted]}>
-              SIRET : XXX XXX XXX 00001
-            </Text>
-            <Text style={[styles.partyLine, styles.partyMuted]}>
-              contact@agence-prime.fr
+              {ISSUER.website}
             </Text>
           </View>
           <View style={styles.partyBlock}>
@@ -319,9 +337,11 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
           <Text>
             {isQuote
               ? "Devis valable 30 jours. À retourner signé avec mention « Bon pour accord »."
-              : "TVA non applicable, art. 293 B du CGI (à adapter selon régime). En cas de retard de paiement, des pénalités de 3 fois le taux d'intérêt légal s'appliqueront, ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 €."}
+              : `${ISSUER.vatRegime} En cas de retard de paiement, des pénalités de 3 fois le taux d'intérêt légal s'appliqueront, ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 €.`}
           </Text>
-          <Text style={{ marginTop: 4 }}>norva. — Agence Prime</Text>
+          <Text style={{ marginTop: 4 }}>
+            {ISSUER.name} · {ISSUER.email}
+          </Text>
         </View>
       </Page>
     </Document>

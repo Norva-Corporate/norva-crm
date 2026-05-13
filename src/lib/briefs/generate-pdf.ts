@@ -232,15 +232,28 @@ function buildHtml(brief: BriefForPdf): string {
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
+  /* Permet de garder le fond midnight même quand une page se déroule
+     sur plusieurs pages PDF. Sans ça, les pages suivantes auraient un
+     fond blanc/transparent qui casserait le look. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: var(--midnight);
+    z-index: -1;
+  }
+  @page {
+    size: A4;
+    margin: 14mm 14mm;
+  }
   .page {
-    padding: 40px 48px;
-    min-height: 100vh;
+    padding: 0;
   }
   .accent-bar {
     width: 40px;
     height: 1px;
     background: var(--signal);
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .label-mono {
     font-family: "DM Mono", monospace;
@@ -257,20 +270,22 @@ function buildHtml(brief: BriefForPdf): string {
     color: var(--signal);
   }
   .header {
-    margin-bottom: 56px;
+    margin-bottom: 32px;
+    page-break-after: avoid;
+    break-after: avoid;
   }
   .header h1 {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 500;
     letter-spacing: -0.03em;
     line-height: 1.05;
-    margin: 12px 0 16px;
+    margin: 10px 0 12px;
     color: var(--ice);
   }
   .header .meta {
-    font-size: 11px;
+    font-size: 10.5px;
     color: var(--mist);
-    line-height: 1.7;
+    line-height: 1.6;
   }
   .header .meta strong {
     color: var(--ice);
@@ -278,9 +293,8 @@ function buildHtml(brief: BriefForPdf): string {
   }
   .brief-section {
     border-left: 1px solid rgba(255, 255, 255, 0.08);
-    padding-left: 24px;
-    margin-bottom: 40px;
-    page-break-inside: avoid;
+    padding-left: 18px;
+    margin-bottom: 24px;
     position: relative;
   }
   .brief-section::before {
@@ -289,26 +303,31 @@ function buildHtml(brief: BriefForPdf): string {
     left: -1px;
     top: 0;
     width: 1px;
-    height: 36px;
+    height: 28px;
     background: var(--signal);
   }
   .section-tag {
-    margin: 0 0 8px;
+    margin: 0 0 6px;
+    page-break-after: avoid;
+    break-after: avoid;
   }
   .section-title {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: 500;
     letter-spacing: -0.02em;
-    margin: 0 0 18px;
+    margin: 0 0 14px;
     color: var(--ice);
+    page-break-after: avoid;
+    break-after: avoid;
   }
   .section-fields {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
   .field {
     page-break-inside: avoid;
+    break-inside: avoid;
   }
   .field-label {
     font-family: "DM Mono", monospace;
@@ -316,15 +335,17 @@ function buildHtml(brief: BriefForPdf): string {
     letter-spacing: 0.10em;
     text-transform: uppercase;
     color: var(--mist);
-    margin-bottom: 6px;
+    margin-bottom: 5px;
+    page-break-after: avoid;
+    break-after: avoid;
   }
   .field-value {
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--ice);
-    line-height: 1.55;
+    line-height: 1.5;
     background: var(--navy-deep);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 12px 14px;
+    padding: 10px 12px;
   }
   .field-value ul {
     margin: 0;
@@ -424,8 +445,8 @@ function buildHtml(brief: BriefForPdf): string {
     margin: 0;
   }
   .footer {
-    margin-top: 48px;
-    padding-top: 16px;
+    margin-top: 32px;
+    padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     justify-content: space-between;
@@ -434,6 +455,8 @@ function buildHtml(brief: BriefForPdf): string {
     color: var(--mist);
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .brand {
     color: var(--ice);
@@ -527,7 +550,9 @@ export async function generateBriefPdf(brief: BriefForPdf): Promise<Buffer> {
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+      // Les marges sont définies via @page dans le CSS pour permettre
+      // une mise en page cohérente sur toutes les pages.
+      preferCSSPageSize: true,
     });
     console.log("[briefs/pdf] pdf rendered, bytes:", pdf.length);
     return Buffer.from(pdf);
