@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "src/app/api/briefs/[id]/pdf/route.ts": {
+      "memory": 3008,
+      "maxDuration": 60
+    },
+    "src/app/api/invoices/[id]/pdf/route.ts": {
+      "memory": 3008,
+      "maxDuration": 60
+    }
+  }
+}

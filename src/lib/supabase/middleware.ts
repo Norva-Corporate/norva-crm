@@ -8,6 +8,9 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/auth/")) return true;
   // Webhooks authenticate via their own shared-secret header
   if (pathname.startsWith("/api/webhooks/")) return true;
+  // Brief endpoints called cross-origin from the vitrine (token-based access)
+  if (pathname === "/api/briefs/verify-token") return true;
+  if (pathname === "/api/briefs/submit") return true;
   return false;
 }
 
