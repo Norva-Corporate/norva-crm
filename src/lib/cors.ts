@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Normalise une origin pour la comparaison CORS :
+ * - trim whitespace
+ * - retire les slashes finaux (le browser envoie l'origin sans slash,
+ *   mais on tolère que l'admin ait set la variable avec un slash de fin)
+ * - lowercase pour neutraliser les variations de casse
+ */
+function normalizeOrigin(value: string): string {
+  return value.trim().replace(/\/+$/, "").toLowerCase();
+}
+
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
-  .map((s) => s.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
 
 function resolveOrigin(req: NextRequest): string {
-  const origin = req.headers.get("origin") ?? "";
+  const raw = req.headers.get("origin") ?? "";
+  const origin = normalizeOrigin(raw);
   if (allowedOrigins.length === 0) return "";
   if (allowedOrigins.includes(origin)) return origin;
   return allowedOrigins[0];
