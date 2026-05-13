@@ -271,8 +271,6 @@ function buildHtml(brief: BriefForPdf): string {
   }
   .header {
     margin-bottom: 32px;
-    page-break-after: avoid;
-    break-after: avoid;
   }
   .header h1 {
     font-size: 28px;
@@ -308,8 +306,6 @@ function buildHtml(brief: BriefForPdf): string {
   }
   .section-tag {
     margin: 0 0 6px;
-    page-break-after: avoid;
-    break-after: avoid;
   }
   .section-title {
     font-size: 15px;
@@ -317,8 +313,6 @@ function buildHtml(brief: BriefForPdf): string {
     letter-spacing: -0.02em;
     margin: 0 0 14px;
     color: var(--ice);
-    page-break-after: avoid;
-    break-after: avoid;
   }
   .section-fields {
     display: flex;
@@ -336,8 +330,6 @@ function buildHtml(brief: BriefForPdf): string {
     text-transform: uppercase;
     color: var(--mist);
     margin-bottom: 5px;
-    page-break-after: avoid;
-    break-after: avoid;
   }
   .field-value {
     font-size: 11px;

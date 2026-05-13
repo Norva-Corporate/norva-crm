@@ -227,11 +227,11 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
             <Text style={[styles.partyLine, styles.partyName]}>
               {ISSUER.name}
             </Text>
-            {ISSUER.siret && (
+            {ISSUER.siret ? (
               <Text style={[styles.partyLine, styles.partyMuted]}>
-                SIRET : {ISSUER.siret}
+                {`SIRET : ${ISSUER.siret}`}
               </Text>
-            )}
+            ) : null}
             <Text style={[styles.partyLine, styles.partyMuted]}>
               {ISSUER.email}
             </Text>
@@ -241,19 +241,19 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
           </View>
           <View style={styles.partyBlock}>
             <Text style={styles.partyLabel}>Client</Text>
-            {invoice.company && (
+            {invoice.company ? (
               <Text style={[styles.partyLine, styles.partyName]}>
                 {invoice.company.name}
               </Text>
-            )}
-            {invoice.contact && (
+            ) : null}
+            {invoice.contact ? (
               <Text style={[styles.partyLine, styles.partyMuted]}>
-                {invoice.contact.first_name} {invoice.contact.last_name}
+                {`${invoice.contact.first_name} ${invoice.contact.last_name}`}
               </Text>
-            )}
-            {!invoice.company && !invoice.contact && (
+            ) : null}
+            {!invoice.company && !invoice.contact ? (
               <Text style={[styles.partyLine, styles.partyMuted]}>—</Text>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -325,12 +325,12 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
         </View>
 
         {/* Notes */}
-        {invoice.notes && (
+        {invoice.notes ? (
           <View style={styles.notes}>
             <Text style={styles.notesLabel}>Notes</Text>
             <Text style={styles.notesText}>{invoice.notes}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Mentions légales */}
         <View style={styles.legal}>
