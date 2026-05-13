@@ -1,13 +1,15 @@
-import { createElement, type ReactElement } from "react";
 import { NextResponse } from "next/server";
-import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
-import { InvoicePDF } from "@/lib/pdf/InvoicePDF";
 import { getInvoiceWithDetails } from "@/lib/actions/invoices";
+import {
+  generateInvoicePdf,
+  invoicePdfFilename,
+  type InvoiceForPdf,
+} from "@/lib/pdf/generate-invoice-pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET(
   _req: Request,
@@ -31,55 +33,40 @@ export async function GET(
       );
     }
 
-    console.log(
-      `[invoices/pdf] rendering ${invoice.type} ${invoice.number} (${invoice.items?.length ?? 0} items)`
-    );
+    const invoiceForPdf: InvoiceForPdf = {
+      number: invoice.number,
+      type: invoice.type,
+      issue_date: invoice.issue_date,
+      due_date: invoice.due_date,
+      subtotal: Number(invoice.subtotal),
+      tax_rate: Number(invoice.tax_rate),
+      tax_amount: Number(invoice.tax_amount),
+      total: Number(invoice.total),
+      notes: invoice.notes,
+      contact: invoice.contact
+        ? {
+            first_name: invoice.contact.first_name ?? "",
+            last_name: invoice.contact.last_name ?? "",
+          }
+        : null,
+      company: invoice.company ? { name: invoice.company.name ?? "" } : null,
+      items: (invoice.items ?? []).map(
+        (it: {
+          description: string | null;
+          quantity: number;
+          unit_price: number;
+          total: number;
+        }) => ({
+          description: it.description ?? "",
+          quantity: Number(it.quantity),
+          unit_price: Number(it.unit_price),
+          total: Number(it.total),
+        })
+      ),
+    };
 
-    const element = createElement(InvoicePDF, {
-      invoice: {
-        number: invoice.number,
-        type: invoice.type,
-        issue_date: invoice.issue_date,
-        due_date: invoice.due_date,
-        subtotal: Number(invoice.subtotal),
-        tax_rate: Number(invoice.tax_rate),
-        tax_amount: Number(invoice.tax_amount),
-        total: Number(invoice.total),
-        notes: invoice.notes,
-        contact: invoice.contact
-          ? {
-              first_name: invoice.contact.first_name ?? "",
-              last_name: invoice.contact.last_name ?? "",
-            }
-          : null,
-        company: invoice.company ? { name: invoice.company.name ?? "" } : null,
-        items: (invoice.items ?? []).map(
-          (it: {
-            description: string | null;
-            quantity: number;
-            unit_price: number;
-            total: number;
-          }) => ({
-            description: it.description ?? "",
-            quantity: Number(it.quantity),
-            unit_price: Number(it.unit_price),
-            total: Number(it.total),
-          })
-        ),
-      },
-    });
-
-    const buffer = await renderToBuffer(
-      element as unknown as ReactElement<DocumentProps>
-    );
-
-    console.log(
-      `[invoices/pdf] rendered ${invoice.number}, bytes=${buffer.length}`
-    );
-
-    const filename = `${invoice.type === "quote" ? "Devis" : "Facture"}-${
-      invoice.number
-    }.pdf`;
+    const buffer = await generateInvoicePdf(invoiceForPdf);
+    const filename = invoicePdfFilename(invoiceForPdf);
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
