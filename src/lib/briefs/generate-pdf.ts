@@ -475,33 +475,44 @@ function buildHtml(brief: BriefForPdf): string {
 async function launchBrowser(): Promise<Browser> {
   const local = process.env.LOCAL_CHROMIUM_PATH;
   if (local) {
+    console.log("[briefs/pdf] launching local chromium:", local);
     return puppeteer.launch({
       executablePath: local,
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
   }
+  const execPath = await chromium.executablePath();
+  console.log("[briefs/pdf] launching @sparticuz/chromium at:", execPath);
   return puppeteer.launch({
     args: chromium.args,
-    executablePath: await chromium.executablePath(),
+    executablePath: execPath,
     headless: true,
   });
 }
 
 // ── Public API ──────────────────────────────────────────────
 export async function generateBriefPdf(brief: BriefForPdf): Promise<Buffer> {
+  console.log("[briefs/pdf] start generation for", brief.id);
   const html = buildHtml(brief);
+  console.log("[briefs/pdf] html built, length:", html.length);
+
   const browser = await launchBrowser();
+  console.log("[briefs/pdf] browser launched");
+
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "load" });
+    console.log("[briefs/pdf] content set");
     // Attendre que les fonts Google soient chargées avant le snapshot.
     await page.evaluate(() => document.fonts.ready);
+    console.log("[briefs/pdf] fonts ready");
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
     });
+    console.log("[briefs/pdf] pdf rendered, bytes:", pdf.length);
     return Buffer.from(pdf);
   } finally {
     await browser.close();

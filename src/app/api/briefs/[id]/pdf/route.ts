@@ -95,9 +95,15 @@ export async function GET(
   try {
     pdfBuffer = await generateBriefPdf(briefForPdf);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
     console.error("[briefs/pdf] generation failed:", err);
     return NextResponse.json(
-      { error: "Échec de génération PDF" },
+      {
+        error: "Échec de génération PDF",
+        detail: message,
+        stack: process.env.NODE_ENV === "production" ? undefined : stack,
+      },
       { status: 500 }
     );
   }

@@ -256,6 +256,7 @@ export async function createProjectFromBrief(
     description,
     contact_id: brief.contact_id,
     company_id: brief.company_id,
+    brief_id: brief.id,
     status: "en_attente",
   });
 

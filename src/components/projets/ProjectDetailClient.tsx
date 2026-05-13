@@ -11,12 +11,15 @@ import {
   Building2,
   TrendingUp,
   FileText,
+  ClipboardList,
+  Download,
   CheckCircle2,
   Circle,
   Clock,
   Flame,
   AlertCircle,
   ListChecks,
+  ExternalLink,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +97,11 @@ type ProjectDetail = Project & {
   contact: { id: string; first_name: string; last_name: string } | null;
   company: { id: string; name: string } | null;
   assignee: { id: string; full_name: string | null } | null;
+  brief: {
+    id: string;
+    prospect_nom: string | null;
+    submitted_at: string;
+  } | null;
   invoices: InvoiceLite[];
 };
 
@@ -439,6 +447,29 @@ export function ProjectDetailClient({
                 }}
               />
             </InfoRow>
+            {project.brief && (
+              <InfoRow icon={ClipboardList} label="Brief source">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/dashboard/briefs/${project.brief.id}`}
+                    className="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+                  >
+                    {project.brief.prospect_nom ?? "Brief"}
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                  <a
+                    href={`/api/briefs/${project.brief.id}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors border border-[var(--border)] px-2 py-0.5"
+                    title="Télécharger le brief en PDF"
+                  >
+                    <Download className="h-3 w-3" />
+                    PDF
+                  </a>
+                </div>
+              </InfoRow>
+            )}
           </Card>
 
           <Card className="p-4 space-y-3">

@@ -20,6 +20,7 @@ export interface ProjectInput {
   budget?: number | null;
   duration_days?: number;
   assigned_to?: string | null;
+  brief_id?: string | null;
 }
 
 export type ActionResult<T = null> =
@@ -27,7 +28,7 @@ export type ActionResult<T = null> =
   | { success: false; error: string };
 
 const PROJECT_SELECT =
-  "*, deal:deals(id, title, value, contact:contacts(id, first_name, last_name), company:companies(id, name)), contact:contacts!projects_contact_id_fkey(id, first_name, last_name), company:companies!projects_company_id_fkey(id, name), assignee:profiles!projects_assigned_to_fkey(id, full_name)";
+  "*, deal:deals(id, title, value, contact:contacts(id, first_name, last_name), company:companies(id, name)), contact:contacts!projects_contact_id_fkey(id, first_name, last_name), company:companies!projects_company_id_fkey(id, name), assignee:profiles!projects_assigned_to_fkey(id, full_name), brief:briefs(id, prospect_nom, submitted_at)";
 
 const VALID_STATUSES: ProjectStatus[] = [
   "en_attente",
@@ -93,6 +94,7 @@ export async function createProject(
     end_date: data.end_date,
     budget: data.budget ?? null,
     assigned_to: data.assigned_to,
+    brief_id: data.brief_id,
   });
 
   const duration = clampDuration(data.duration_days);
