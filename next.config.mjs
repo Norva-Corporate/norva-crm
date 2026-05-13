@@ -10,6 +10,15 @@ const nextConfig = {
     "puppeteer-core",
     "@sparticuz/chromium",
   ],
+  // Inclure le dossier bin/ de @sparticuz/chromium dans le lambda Vercel
+  // de la route PDF. Sans ça, le tracing Next.js n'embarque pas les
+  // archives .br (chromium.br, fonts.tar.br, swiftshader.tar.br, al2023.tar.br)
+  // et le binary est introuvable au runtime → ENOENT sur /var/task/.../bin
+  outputFileTracingIncludes: {
+    "/api/briefs/[id]/pdf": [
+      "./node_modules/@sparticuz/chromium/bin/**/*",
+    ],
+  },
 };
 
 export default nextConfig;
