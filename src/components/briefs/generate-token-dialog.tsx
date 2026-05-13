@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type {
+  ContactOption,
+  CompanyOption,
+} from "@/lib/actions/briefs";
 
 const DURATIONS: { value: string; label: string }[] = [
   { value: "24", label: "24 heures" },
@@ -30,15 +34,37 @@ const DURATIONS: { value: string; label: string }[] = [
   { value: "168", label: "7 jours" },
 ];
 
+const NO_VALUE = "__none__";
+
 type GeneratedLink = {
   token: string;
   url: string;
   expires_at: string;
 };
 
-export function GenerateTokenDialog() {
+interface GenerateTokenDialogProps {
+  contacts: ContactOption[];
+  companies: CompanyOption[];
+}
+
+function contactLabel(c: ContactOption): string {
+  const name = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+  if (name && c.email) return `${name} · ${c.email}`;
+  return name || c.email || "(sans nom)";
+}
+
+function contactFullName(c: ContactOption): string {
+  return [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+}
+
+export function GenerateTokenDialog({
+  contacts,
+  companies,
+}: GenerateTokenDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [contactId, setContactId] = useState<string>("");
+  const [companyId, setCompanyId] = useState<string>("");
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
   const [entreprise, setEntreprise] = useState("");
@@ -47,13 +73,50 @@ export function GenerateTokenDialog() {
   const [generated, setGenerated] = useState<GeneratedLink | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const companiesById = useMemo(
+    () => new Map(companies.map((c) => [c.id, c])),
+    [companies]
+  );
+
   const reset = () => {
+    setContactId("");
+    setCompanyId("");
     setNom("");
     setEmail("");
     setEntreprise("");
     setHours("72");
     setGenerated(null);
     setCopied(false);
+  };
+
+  const handleContactChange = (v: string) => {
+    if (v === NO_VALUE) {
+      setContactId("");
+      return;
+    }
+    setContactId(v);
+    const c = contacts.find((x) => x.id === v);
+    if (!c) return;
+
+    // Auto-remplissage (champs restent éditables)
+    const name = contactFullName(c);
+    if (name) setNom(name);
+    if (c.email) setEmail(c.email);
+    if (c.company_id) {
+      setCompanyId(c.company_id);
+      const linkedCompany = companiesById.get(c.company_id);
+      if (linkedCompany) setEntreprise(linkedCompany.name);
+    }
+  };
+
+  const handleCompanyChange = (v: string) => {
+    if (v === NO_VALUE) {
+      setCompanyId("");
+      return;
+    }
+    setCompanyId(v);
+    const co = companiesById.get(v);
+    if (co) setEntreprise(co.name);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,6 +132,8 @@ export function GenerateTokenDialog() {
           prospect_nom: nom.trim(),
           prospect_email: email.trim(),
           prospect_entreprise: entreprise.trim() || null,
+          contact_id: contactId || null,
+          company_id: companyId || null,
           expires_in_hours: Number(hours),
         }),
       });
@@ -192,10 +257,64 @@ export function GenerateTokenDialog() {
             <DialogHeader>
               <DialogTitle>Générer un lien brief</DialogTitle>
               <DialogDescription>
-                Crée un lien unique à durée limitée pour un prospect.
+                Sélectionne un contact / entreprise existant ou saisis un nouveau prospect.
               </DialogDescription>
             </DialogHeader>
             <div className="px-4 md:px-6 pb-4 space-y-4">
+              {/* Pickers CRM */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">
+                    Contact CRM
+                  </label>
+                  <Select
+                    value={contactId || NO_VALUE}
+                    onValueChange={handleContactChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Aucun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_VALUE}>
+                        <span className="text-muted-foreground">Aucun</span>
+                      </SelectItem>
+                      {contacts.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {contactLabel(c)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">
+                    Entreprise CRM
+                  </label>
+                  <Select
+                    value={companyId || NO_VALUE}
+                    onValueChange={handleCompanyChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Aucune" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_VALUE}>
+                        <span className="text-muted-foreground">Aucune</span>
+                      </SelectItem>
+                      {companies.map((co) => (
+                        <SelectItem key={co.id} value={co.id}>
+                          {co.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground">
+                Snapshot envoyé au prospect (modifiable) :
+              </p>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">
                   Nom du prospect

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const service = createServiceClient();
   const { data, error } = await service
     .from("brief_tokens")
-    .select("prospect_nom, prospect_entreprise, expires_at, used")
+    .select("prospect_nom, prospect_entreprise, expires_at, used, archived_at")
     .eq("token", token)
     .maybeSingle();
 
@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-  if (!data) {
+  // Token archivé = invisible côté vitrine (équivalent à "not_found")
+  if (!data || data.archived_at) {
     return jsonWithCors(req, { valid: false, reason: "not_found" });
   }
   if (data.used) {

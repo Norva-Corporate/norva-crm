@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
 import { jsonWithCors, preflight } from "@/lib/cors";
+import { sendBriefNotificationEmail } from "@/lib/briefs/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,11 +35,12 @@ export async function POST(req: NextRequest) {
 
   const service = createServiceClient();
 
-  // Lecture du token pour récupérer les infos prospect (snapshot dans briefs).
+  // Lecture du token pour récupérer les infos prospect + liens CRM
+  // (snapshot dans briefs pour conservation historique).
   const { data: tokenRow, error: readErr } = await service
     .from("brief_tokens")
     .select(
-      "id, prospect_nom, prospect_email, prospect_entreprise, expires_at, used"
+      "id, prospect_nom, prospect_email, prospect_entreprise, contact_id, company_id, expires_at, used, archived_at"
     )
     .eq("token", parsed.data.token)
     .maybeSingle();
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (readErr) {
     return jsonWithCors(req, { error: "Erreur serveur" }, { status: 500 });
   }
-  if (!tokenRow) {
+  if (!tokenRow || tokenRow.archived_at) {
     return jsonWithCors(req, { error: "Token introuvable" }, { status: 404 });
   }
   if (tokenRow.used) {
@@ -79,6 +81,8 @@ export async function POST(req: NextRequest) {
       prospect_nom: tokenRow.prospect_nom,
       prospect_email: tokenRow.prospect_email,
       prospect_entreprise: tokenRow.prospect_entreprise,
+      contact_id: tokenRow.contact_id,
+      company_id: tokenRow.company_id,
       reponses: parsed.data.reponses,
     })
     .select("id")
@@ -96,6 +100,17 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  // Notification email (fire-and-forget, ne fait pas échouer la soumission)
+  await sendBriefNotificationEmail({
+    briefId: brief.id,
+    prospect_nom: tokenRow.prospect_nom,
+    prospect_email: tokenRow.prospect_email,
+    prospect_entreprise: tokenRow.prospect_entreprise,
+    reponses: parsed.data.reponses,
+  }).catch((e) => {
+    console.error("[briefs/submit] notification email error:", e);
+  });
 
   return jsonWithCors(req, { success: true, brief_id: brief.id });
 }

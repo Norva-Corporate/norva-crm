@@ -11,6 +11,8 @@ const bodySchema = z.object({
   prospect_email: z.string().trim().email("Email invalide").max(200),
   prospect_entreprise: z.string().trim().max(200).optional().nullable(),
   expires_in_hours: z.number().int().min(1).max(168).optional(),
+  contact_id: z.string().uuid().optional().nullable(),
+  company_id: z.string().uuid().optional().nullable(),
 });
 
 export async function POST(req: NextRequest) {
@@ -49,6 +51,8 @@ export async function POST(req: NextRequest) {
       prospect_nom: parsed.data.prospect_nom,
       prospect_email: parsed.data.prospect_email,
       prospect_entreprise: parsed.data.prospect_entreprise ?? null,
+      contact_id: parsed.data.contact_id ?? null,
+      company_id: parsed.data.company_id ?? null,
       expires_at: expiresAt.toISOString(),
       created_by: user.id,
     })
