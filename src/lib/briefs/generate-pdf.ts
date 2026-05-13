@@ -472,6 +472,19 @@ function buildHtml(brief: BriefForPdf): string {
 }
 
 // ── Browser bootstrap ───────────────────────────────────────
+// Sur Vercel + Turbopack, outputFileTracingIncludes n'est pas honoré
+// pour les fichiers binaires .br du dossier bin/ de @sparticuz/chromium.
+// On utilise donc le mode "URL" : @sparticuz/chromium télécharge le
+// tar.br depuis GitHub Releases au runtime quand executablePath() reçoit
+// une URL. Le tar est extrait dans /tmp et le binary est utilisable.
+// → cold start +3-5s la 1ère fois, instantané ensuite (lambda chaud +
+//   cache PDF dans Supabase Storage).
+//
+// IMPORTANT: la version doit matcher la version installée de
+// @sparticuz/chromium dans package.json (actuellement ^148.0.0).
+const CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v148.0.0/chromium-v148.0.0-pack.x64.tar";
+
 async function launchBrowser(): Promise<Browser> {
   const local = process.env.LOCAL_CHROMIUM_PATH;
   if (local) {
@@ -482,8 +495,12 @@ async function launchBrowser(): Promise<Browser> {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
   }
-  const execPath = await chromium.executablePath();
-  console.log("[briefs/pdf] launching @sparticuz/chromium at:", execPath);
+  console.log(
+    "[briefs/pdf] resolving @sparticuz/chromium from:",
+    CHROMIUM_PACK_URL
+  );
+  const execPath = await chromium.executablePath(CHROMIUM_PACK_URL);
+  console.log("[briefs/pdf] chromium ready at:", execPath);
   return puppeteer.launch({
     args: chromium.args,
     executablePath: execPath,
