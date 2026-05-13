@@ -8,17 +8,12 @@ import {
 } from "@react-pdf/renderer";
 
 // ── Branding émetteur (norva.) ──────────────────────────────────
-// Si tu déclares un SIRET ou autres mentions légales, modifie ici.
-const ISSUER = {
-  name: "norva.",
-  email: "norvagroupe@gmail.com",
-  website: "norva-corporate.fr",
-  // Laisser vide pour masquer la ligne SIRET (sinon : "123 456 789 00001")
-  siret: "",
-  // Régime TVA — utilisé dans la mention légale en bas de facture
-  vatRegime:
-    "TVA non applicable, art. 293 B du CGI (à adapter selon votre régime).",
-} as const;
+// Si tu veux ajouter SIRET / autres mentions, édite les <Text> dans
+// le bloc Émetteur ci-dessous (cherche "ÉMETTEUR norva." dans le JSX).
+// Les valeurs sont hardcodées (pas de variable) pour rester compatible
+// avec @react-pdf/renderer qui est strict sur ses children.
+const VAT_REGIME =
+  "TVA non applicable, art. 293 B du CGI (à adapter selon votre régime).";
 
 interface InvoicePDFProps {
   invoice: {
@@ -199,59 +194,56 @@ function formatDate(d: string | null | undefined) {
 export function InvoicePDF({ invoice }: InvoicePDFProps) {
   const isQuote = invoice.type === "quote";
 
+  const docTitle = isQuote ? "Devis" : "Facture";
+  const clientName = invoice.company?.name ?? "";
+  const clientContact = invoice.contact
+    ? `${invoice.contact.first_name} ${invoice.contact.last_name}`.trim()
+    : "";
+  const hasClient = clientName.length > 0 || clientContact.length > 0;
+
   return (
-    <Document
-      title={`${isQuote ? "Devis" : "Facture"} ${invoice.number}`}
-      author={ISSUER.name}
-    >
+    <Document title={`${docTitle} ${invoice.number}`} author="norva.">
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.brandRow}>
             <Text style={styles.brandSquare}>N</Text>
             <View>
-              <Text style={styles.brandName}>{ISSUER.name}</Text>
-              <Text style={styles.brandSub}>{ISSUER.website}</Text>
+              <Text style={styles.brandName}>norva.</Text>
+              <Text style={styles.brandSub}>norva-corporate.fr</Text>
             </View>
           </View>
           <View style={styles.docMeta}>
-            <Text style={styles.docKind}>{isQuote ? "Devis" : "Facture"}</Text>
+            <Text style={styles.docKind}>{docTitle}</Text>
             <Text style={styles.docNumber}>{invoice.number}</Text>
           </View>
         </View>
 
-        {/* Sender / Receiver */}
+        {/* Sender / Receiver — ÉMETTEUR norva. */}
         <View style={styles.parties}>
           <View style={styles.partyBlock}>
             <Text style={styles.partyLabel}>Émetteur</Text>
-            <Text style={[styles.partyLine, styles.partyName]}>
-              {ISSUER.name}
-            </Text>
-            {ISSUER.siret ? (
-              <Text style={[styles.partyLine, styles.partyMuted]}>
-                {`SIRET : ${ISSUER.siret}`}
-              </Text>
-            ) : null}
+            <Text style={[styles.partyLine, styles.partyName]}>norva.</Text>
             <Text style={[styles.partyLine, styles.partyMuted]}>
-              {ISSUER.email}
+              norvagroupe@gmail.com
             </Text>
             <Text style={[styles.partyLine, styles.partyMuted]}>
-              {ISSUER.website}
+              norva-corporate.fr
             </Text>
           </View>
           <View style={styles.partyBlock}>
             <Text style={styles.partyLabel}>Client</Text>
-            {invoice.company ? (
+            {clientName.length > 0 ? (
               <Text style={[styles.partyLine, styles.partyName]}>
-                {invoice.company.name}
+                {clientName}
               </Text>
             ) : null}
-            {invoice.contact ? (
+            {clientContact.length > 0 ? (
               <Text style={[styles.partyLine, styles.partyMuted]}>
-                {`${invoice.contact.first_name} ${invoice.contact.last_name}`}
+                {clientContact}
               </Text>
             ) : null}
-            {!invoice.company && !invoice.contact ? (
+            {!hasClient ? (
               <Text style={[styles.partyLine, styles.partyMuted]}>—</Text>
             ) : null}
           </View>
@@ -337,10 +329,10 @@ export function InvoicePDF({ invoice }: InvoicePDFProps) {
           <Text>
             {isQuote
               ? "Devis valable 30 jours. À retourner signé avec mention « Bon pour accord »."
-              : `${ISSUER.vatRegime} En cas de retard de paiement, des pénalités de 3 fois le taux d'intérêt légal s'appliqueront, ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 €.`}
+              : `${VAT_REGIME} En cas de retard de paiement, des pénalités de 3 fois le taux d'intérêt légal s'appliqueront, ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 €.`}
           </Text>
           <Text style={{ marginTop: 4 }}>
-            {ISSUER.name} · {ISSUER.email}
+            norva. · norvagroupe@gmail.com
           </Text>
         </View>
       </Page>

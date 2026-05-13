@@ -31,7 +31,7 @@ export default async function AuthLayout({
       </div>
 
       <p className="text-[10px] text-muted-foreground mt-10 opacity-60">
-        norva CRM · Agence Prime
+        norva CRM
       </p>
     </div>
   );

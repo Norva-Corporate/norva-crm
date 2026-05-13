@@ -179,7 +179,7 @@ export function InvoiceDetailClient({
                     norva.
                   </p>
                   <p className="text-[10px] text-[#6B7280]">
-                    Agence Prime
+                    norva-corporate.fr
                   </p>
                 </div>
               </div>
@@ -207,9 +207,9 @@ export function InvoiceDetailClient({
                 <p className="text-[10px] uppercase tracking-wide text-[#6B7280] mb-1">
                   Émetteur
                 </p>
-                <p className="font-medium">norva. — Agence Prime</p>
-                <p className="text-[#6B7280]">SIRET : XXX XXX XXX 00001</p>
-                <p className="text-[#6B7280]">contact@agence-prime.fr</p>
+                <p className="font-medium">norva.</p>
+                <p className="text-[#6B7280]">norvagroupe@gmail.com</p>
+                <p className="text-[#6B7280]">norva-corporate.fr</p>
               </div>
               <div className="space-y-0.5">
                 <p className="text-[10px] uppercase tracking-wide text-[#6B7280] mb-1">
@@ -330,7 +330,7 @@ export function InvoiceDetailClient({
                   ? "Devis valable 30 jours. À retourner signé avec mention « Bon pour accord »."
                   : "TVA non applicable, art. 293 B du CGI (à adapter selon régime). En cas de retard de paiement, des pénalités de 3 fois le taux d'intérêt légal s'appliqueront, ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 €."}
               </p>
-              <p className="mt-1">norva. — Agence Prime</p>
+              <p className="mt-1">norva. · norvagroupe@gmail.com</p>
             </div>
           </div>
         </div>
