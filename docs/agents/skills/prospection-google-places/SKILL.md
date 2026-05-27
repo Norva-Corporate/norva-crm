@@ -22,7 +22,7 @@ Utilise l'outil Bash :
     curl -X POST 'https://places.googleapis.com/v1/places:searchText' \
       -H 'Content-Type: application/json' \
       -H "X-Goog-Api-Key: $GOOGLE_MAPS_API_KEY" \
-      -H 'X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.types,places.businessStatus' \
+      -H 'X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.types,places.businessStatus,places.googleMapsUri' \
       -d '{
         "textQuery": "<activité> <ville>",
         "languageCode": "fr",
@@ -34,12 +34,13 @@ Utilise l'outil Bash :
 
 | Champ API Places | Destination Norva |
 |------------------|-------------------|
-| `id` | `external_id` (format `places/ChIJ...`, stable) |
+| `id` | `external_id` (format `places/ChIJ...`, stable) + `raw_payload.place_id` |
 | `displayName.text` | `company_name` |
 | `formattedAddress` | `raw_payload.address` |
 | `nationalPhoneNumber` | `phone` (préférer cette forme) |
 | `internationalPhoneNumber` | `phone` (fallback) |
 | `websiteUri` | `raw_payload.website` (peut être null = OK) |
+| `googleMapsUri` | `raw_payload.google_maps_url` (URL canonique de la fiche Google Maps) |
 | `rating` | `raw_payload.google_rating` |
 | `userRatingCount` | `raw_payload.review_count` |
 | `types` | indice pour `raw_payload.sector` |
