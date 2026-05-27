@@ -105,13 +105,21 @@ critère ("5 coiffeurs à Lyon 6e").
 
 | Agent | Skills métier | Skills transverses |
 |-------|---------------|---------------------|
-| **Lead Intake** | google-places, enrichment-gouv, **sirene**, **pappers**, bodacc-check, site-audit, pagespeed-check, email-discovery, email-verification, scoring | norva-supabase-insert |
+| **Lead Intake** | google-places, enrichment-gouv, bodacc-check, site-audit, pagespeed-check, email-discovery, email-verification, scoring | norva-supabase-insert |
 | **Enrichissement** | enrichment-gouv, **sirene**, **pappers**, email-discovery, email-verification, bodacc-check, site-audit, pagespeed-check, scoring | **norva-agent-queue**, norva-supabase-insert |
 | **Premier Contact** | pain-digital-detection, redaction-cold-outreach | **norva-agent-queue**, norva-supabase-insert |
 | **Audit Site** | site-audit | **norva-agent-queue**, norva-supabase-insert |
 | **Re-scoring Deal** | scoring, **signaux-google-news** | **norva-agent-queue**, norva-supabase-insert |
 
 Les skills en **gras** sont les ajouts récents (refonte rework 2026).
+
+> ⚠️ **`prospection-sirene` et `prospection-pappers` ne sont PAS attachées
+> au Lead Intake** par défaut — la combinaison des 11 skills initialement
+> prévues dépassait la fenêtre de contexte du modèle Claude. Elles
+> restent disponibles sur l'Agent Enrichissement (mode queue, 1 lead à
+> la fois, contexte plus léger). Si un lead a besoin d'un signal Budget
+> enrichi (Pappers) ou d'un fallback strict INSEE (Sirene), passe-le
+> par Enrichissement (bouton 🪄) après l'import.
 
 ## Roadmap d'agents (futurs)
 

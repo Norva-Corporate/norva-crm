@@ -26,10 +26,13 @@ seule passe, leads "verts" prêts à examiner.**
   `pipeline_stage='verified'`, `quality_score`, `email_verified`,
   `linkedin_verified`, `company_active`, `pagespeed_score` tous remplis
 - **Volume** : 5-15 prospects par run (qualité > quantité)
-- **Skills** : google-places, enrichment-gouv, **sirene**, **pappers**,
-  bodacc-check, site-audit, pagespeed-check, email-discovery,
-  email-verification, scoring (TPE recalibré, source unique du framework),
-  supabase-insert
+- **Skills** : google-places, enrichment-gouv, bodacc-check, site-audit,
+  pagespeed-check, email-discovery, email-verification, scoring (TPE
+  recalibré, source unique du framework), supabase-insert
+- ⚠️ **Note context window** : `prospection-sirene` et
+  `prospection-pappers` ne sont pas attachées par défaut (dépassement
+  fenêtre Claude). Pour les exploiter, faire passer le lead par
+  l'Agent Enrichissement après import.
 - **Prompt** : `docs/agents/lead-intake-prompt.md`
 
 ### 2. Agent Enrichissement 🪄 *(mode queue uniquement)*

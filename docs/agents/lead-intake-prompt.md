@@ -48,14 +48,12 @@ Tout ça en **UNE seule passe**. Pas de mode "à enrichir plus tard".
   - `PAPPERS_API_KEY` (optionnelle) — Pappers free 100 req/jour (signal Budget)
   - `SIRENE_API_TOKEN` (optionnelle) — INSEE Sirene v3 gratuit (fallback strict)
 
-## Skills attachées (11)
+## Skills attachées (9)
 
 | Skill | Rôle |
 |---|---|
 | `prospection-google-places` | Discovery |
 | `prospection-enrichment-gouv` | Dirigeant + SIRET + effectif (fuzzy par nom) |
-| `prospection-sirene` | Fallback strict par SIRET via INSEE Sirene v3 |
-| `prospection-pappers` | Signal Budget (CA, capital, effectif réel, dirigeants secondaires) |
 | `prospection-site-audit` | Drapeaux qualitatifs du site |
 | `prospection-email-discovery` | Trouver l'email (pro ou perso) |
 | `prospection-email-verification` | Valider l'email (MX + Hunter + Mailboxlayer) |
@@ -63,6 +61,12 @@ Tout ça en **UNE seule passe**. Pas de mode "à enrichir plus tard".
 | `prospection-pagespeed-check` | Score perf site mobile |
 | `prospection-scoring` | **Source unique** scoring 4 axes + seuils décision |
 | `norva-supabase-insert` | Anti-doublon + INSERT |
+
+> ⚠️ **Skills volontairement non attachées ici** (dépassement contexte
+> Claude avec 11 skills) : `prospection-sirene` et `prospection-pappers`.
+> Elles vivent sur l'Agent Enrichissement (mode queue, 1 lead à la
+> fois). Pour enrichir un lead avec Pappers/Sirene, utilise le bouton
+> 🪄 dans Norva après l'import.
 
 **Lis-les avant de démarrer.**
 
@@ -81,24 +85,24 @@ Filtrer immédiatement par effectif et type :
    libéral → continue
 2. Sinon (administration, multinationale, etc.) → SKIP
 
-### Étape 3 — Enrichissement officiel (chaîne)
+### Étape 3 — Enrichissement officiel
 
-Chaîne dans cet ordre, s'arrêter dès qu'on a un SIREN + dirigeant
-identifiés :
+`prospection-enrichment-gouv` (API gouv `recherche-entreprises`, fuzzy
+par nom + ville) :
 
-1. `prospection-enrichment-gouv` (API gouv `recherche-entreprises`,
-   fuzzy par nom + ville)
-2. `prospection-sirene` (fallback strict si pas de match étape 1,
-   ou pour confirmer un SIRET trouvé dans mentions légales)
-3. `prospection-pappers` (compléments Budget si `PAPPERS_API_KEY`
-   présent : CA déclaré, capital, effectif réel, ancienneté)
-
-Récupère : SIREN + prénom/nom du dirigeant + effectif + NAF + signaux Budget.
-
+- Récupère SIREN + prénom/nom du dirigeant + effectif + NAF
+- Si match flou (multiples résultats au même nom) → tagger
+  `raw_payload.warnings = ["dirigeant_non_confirme"]` et continuer
+  (la confirmation stricte via Sirene v3 se fera plus tard si l'user
+  passe le lead à l'Agent Enrichissement)
 - Si `tranche_effectif_salarie` ≥ "21" (50+ salariés) → **SKIP** (hors
   cible TPE)
-- Si Pappers indispo (clé absente ou quota épuisé) → continuer sans
-  enrichir le Budget (fallback Google Places dans le scoring)
+
+**Note** : le signal Budget enrichi (Pappers : CA déclaré, capital,
+effectif réel) ne se fait **pas** ici — c'est l'Agent Enrichissement
+qui s'en charge en mode queue après l'import. Le scoring Budget fait
+fallback sur Google Places (note + nombre d'avis) pour la passe Lead
+Intake initiale.
 
 ### Étape 4 — Vérification entreprise vivante
 `prospection-bodacc-check` avec le SIREN :
@@ -229,8 +233,6 @@ Si match → SKIP, mentionner dans le récap.
 - ❌ JAMAIS inventer un email/téléphone/dirigeant
 - ❌ JAMAIS skip la vérification email si un email a été trouvé
 - ❌ JAMAIS skip BODACC si tu as un SIREN
-- ❌ JAMAIS skip Pappers si tu as un SIREN, que `PAPPERS_API_KEY` est
-  présent, et que `raw_payload.pappers.checked_at` est null ou > 90 jours
 - ❌ JAMAIS insérer un lead avec `company_active = false` ou
   `email_verified = 'invalid'` sans téléphone
 - ❌ JAMAIS prospecter > 49 salariés (hors cible)
