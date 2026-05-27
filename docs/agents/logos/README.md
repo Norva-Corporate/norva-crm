@@ -6,7 +6,7 @@
 
 | # | Agent | Fichier | Couleur |
 |---|-------|---------|---------|
-| 1 | Prospection | `01-prospection.svg` | Indigo `#6366F1` |
+| 1 | Lead Intake | `01-lead-intake.svg` | Indigo `#6366F1` |
 | 2 | Enrichissement | `02-enrichissement.svg` | Violet `#A855F7` |
 | 3 | Premier Contact | `03-premier-contact.svg` | Bleu `#3B82F6` |
 | 4 | Audit Site | `04-audit-site.svg` | Vert `#22C55E` |
@@ -32,11 +32,11 @@ PNG/JPG), convertis avec :
 - **CloudConvert** : <https://cloudconvert.com/svg-to-png>
 - **Sur ta machine** *(si tu as `inkscape` ou `magick`)* :
 
-      inkscape --export-type=png --export-filename=01.png 01-prospection.svg
+      inkscape --export-type=png --export-filename=01.png 01-lead-intake.svg
 
   Ou :
 
-      magick convert -background none -resize 512x512 01-prospection.svg 01.png
+      magick convert -background none -resize 512x512 01-lead-intake.svg 01.png
 
 - **En ligne via Figma** : drag-drop le SVG, export en PNG depuis le menu
 

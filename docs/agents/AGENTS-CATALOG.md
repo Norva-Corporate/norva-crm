@@ -26,28 +26,35 @@ seule passe, leads "verts" prêts à examiner.**
   `pipeline_stage='verified'`, `quality_score`, `email_verified`,
   `linkedin_verified`, `company_active`, `pagespeed_score` tous remplis
 - **Volume** : 5-15 prospects par run (qualité > quantité)
-- **Skills** : google-places, enrichment-gouv, bodacc-check,
-  site-audit, pagespeed-check, email-discovery, email-verification,
-  scoring (TPE recalibré), supabase-insert
+- **Skills** : google-places, enrichment-gouv, **sirene**, **pappers**,
+  bodacc-check, site-audit, pagespeed-check, email-discovery,
+  email-verification, scoring (TPE recalibré, source unique du framework),
+  supabase-insert
 - **Prompt** : `docs/agents/lead-intake-prompt.md`
 
-### 2. Agent Enrichissement 🪄 *(mode queue seulement — refresh legacy)*
+### 2. Agent Enrichissement 🪄 *(mode queue uniquement)*
 
 **Fonction** : Re-enrichit un lead/contact/company existant à la demande
 de l'utilisateur (bouton 🪄). Sert pour les leads importés AVANT le
-nouveau pipeline Lead Intake, ou pour rafraîchir des données vieilles
+pipeline Lead Intake, ou pour rafraîchir des données vieilles
 (> 60 jours).
 
-**Pour les nouveaux prospects, utiliser Lead Intake à la place** —
-Enrichissement ne fait plus de batch de découverte.
+**Pour les nouveaux prospects, utiliser Lead Intake à la place.**
 
-- **Trigger** : Bouton 🪄 sur ligne lead dans `/dashboard/leads`,
-  ou manuel queue-driven
-- **Sources** : API gouv FR, mentions légales, Pages Jaunes, Hunter.io
+L'ancien mode BATCH (rafraîchissement massif manuel) a été supprimé.
+Pour les rafraîchissements en lot, voir la section *Évolutions Multica
+à activer en phase 2* en bas de ce document (Autopilot
+"Enrichissement nocturne").
+
+- **Trigger** : Bouton 🪄 sur ligne lead dans `/dashboard/leads` (queue
+  `agent_tasks`)
+- **Sources** : API gouv FR, Sirene v3 INSEE, Pappers free, BODACC,
+  mentions légales, Hunter.io, Mailboxlayer
 - **Sortie** : UPDATE in-place sur `lead_imports`/`contacts`/`companies`
-  + INSERT activity de trace (sauf pour leads)
-- **Skills** : leads-enrich, enrichment-gouv, email-discovery,
-  email-verification, bodacc-check, site-audit, pagespeed-check,
+  + INSERT activity de trace (sauf pour leads, où on enrichit
+  `raw_payload.enrichment_log`)
+- **Skills** : enrichment-gouv, **sirene**, **pappers**, email-discovery,
+  email-verification, bodacc-check, site-audit, pagespeed-check, scoring,
   supabase-insert, agent-queue
 - **Prompt** : `docs/agents/enrichissement-prompt.md`
 
@@ -89,9 +96,12 @@ création du deal.
 - **Trigger** : Bouton ✨ "Re-scorer ce deal" dans le drawer du
   pipeline
 - **Sources** : Données du deal + contact + company + activities 30j
+  + **signaux Google News** (levée de fonds, recrutements, expansion
+  depuis le dernier scoring)
 - **Sortie** : INSERT 1 activity `type=note` sur le deal avec le
   nouveau breakdown (jamais d'UPDATE des colonnes du deal)
-- **Skills** : scoring, supabase-insert, agent-queue
+- **Skills** : scoring, **signaux-google-news**, supabase-insert,
+  agent-queue
 - **Prompt** : `docs/agents/rescoring-deal-prompt.md`
 
 ---
@@ -204,3 +214,60 @@ Chaque agent doit utiliser un identifiant unique pour le champ
 Les agents qui INSERT dans `activities` mettent leur identité dans
 `payload.agent` (ex. `"agent": "multica-rescoring-deal"`) pour la
 traçabilité.
+
+---
+
+## 📡 Évolutions Multica à activer en phase 2
+
+Multica a introduit des features qu'on n'exploite pas encore et qui
+permettront d'automatiser ce qui est aujourd'hui manuel. **À activer
+seulement quand les 5 agents actuels sont bien calibrés** (= taux de
+SKIP stable, `quality_score` moyen ≥ 70 sur les inserts, peu de bugs
+remontés). Sinon on automatise du bruit.
+
+### Autopilots (cron / webhook / manuel)
+
+Un Autopilot Multica exécute un agent automatiquement selon un trigger.
+Granularité cron à la minute, webhooks limités à 60 req/min et 256 KiB.
+Les erreurs ne sont **pas** auto-relancées — il faut surveiller.
+
+| Autopilot proposé | Trigger | Agent appelé | Quand l'activer |
+|---|---|---|---|
+| **Enrichissement nocturne** | Cron quotidien 3h UTC | Enrichissement | Quand > 50 leads en base avec `verified_at` qui vieillit |
+| **Alertes BODACC** | Cron hebdo (lundi 6h UTC) | Enrichissement (focus BODACC) | Dès qu'on a un pipeline `qualified` ≥ 10 deals |
+| **Suivi Pipeline** | Cron quotidien 8h UTC | Agent #6 (à construire) | Quand pipeline > 20 deals actifs |
+| **Veille Signaux** | Cron hebdo | Agent #10 (à construire) | Pour ABM ciblé sur PME tech |
+
+Le mode BATCH manuel de l'Agent Enrichissement (supprimé dans le
+rework) sera remplacé par l'Autopilot "Enrichissement nocturne" :
+un trigger Postgres alimente `agent_tasks` avec les leads dont
+`verified_at > 60 jours`, et l'Autopilot claim cette queue chaque nuit.
+
+### Squads (multi-agents orchestrés)
+
+Une Squad Multica = un agent **leader** qui reçoit l'assignation et
+route vers le membre spécialisé via `@-mention`. Architecture
+centralisée (pas de peer-to-peer).
+
+**Squad proposée : `Norva Sales Ops`**
+
+- **Leader** : nouvel agent "Norva Dispatcher" (créé spécifiquement
+  pour la Squad, instruction unique = router)
+- **Membres** : Lead Intake, Enrichissement, Premier Contact,
+  Audit Site, Re-scoring Deal
+- **Cas d'usage** : tu poses une demande générique
+  ("traite à fond le prospect Salon Marie Lyon 6e") et le leader
+  enchaîne Lead Intake → Premier Contact → Audit Site
+- **À activer quand** : les 5 agents individuels donnent des résultats
+  fiables (pas avant)
+
+### Conditions pré-activation phase 2
+
+À vérifier avant de basculer en Autopilots/Squads :
+
+- [ ] `quality_score` moyen sur 30 derniers inserts Lead Intake ≥ 70
+- [ ] Taux SKIP étape 11 stable et compris (pas explosif)
+- [ ] Aucune erreur récurrente dans les logs `agent_tasks.error`
+- [ ] Variables d'env optionnelles (Pappers, Sirene, PageSpeed) en place
+- [ ] Au moins 10 leads passés par chaque agent en mode manuel
+- [ ] Backup régulier de `lead_imports` (avant d'enquerre en masse)
