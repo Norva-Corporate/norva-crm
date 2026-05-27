@@ -60,7 +60,8 @@ Le nouveau score est stocké comme `activity` type=note sur le deal
 | Skill | Quand |
 |-------|-------|
 | `norva-agent-queue` | Au démarrage (claim) et à la fin (mark done/error) |
-| `prospection-scoring` | Méthodologie 4 axes (Fit/Pain/Reach/Budget) |
+| `prospection-scoring` | **Source unique** : formule 4 axes + seuils |
+| `signaux-google-news` | Détecter changements externes depuis le dernier scoring (levée, recrutements, expansion) |
 | `norva-supabase-insert` | INSERT activity de trace sur le deal |
 
 ## Workflow MODE QUEUE
@@ -86,9 +87,14 @@ Le nouveau score est stocké comme `activity` type=note sur le deal
       WHERE entity_type = 'deal' AND entity_id = '<task.entity_id>'
       ORDER BY created_at DESC LIMIT 20;
       ```
-   2. Reconstitue le contexte enrichi (depuis `raw_payload`,
-      `site_audit` si dispo, signaux d'engagement = nb d'activités
-      récentes, type d'activité, etc.)
+   2. Reconstitue le contexte enrichi :
+      - `raw_payload` du contact lié (notamment `site_audit`,
+        `pagespeed`, `pappers`, `bodacc_check`)
+      - Signaux d'engagement (nb d'activités 30j, type d'activité)
+      - **Applique `signaux-google-news`** sur le nom de la company
+        pour détecter changements externes depuis le dernier scoring
+        (levée, recrutements > 5 postes, expansion, prix gagné).
+        Skip silencieusement si Google rate-limite.
    3. Identifie le score précédent (s'il y en a un dans une activity
       `type='note'` antérieure) ; sinon score initial = 0.5
    4. Applique `prospection-scoring` (4 axes) sur le contexte actuel

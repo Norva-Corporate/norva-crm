@@ -7,8 +7,11 @@ description: Use this skill to enrich a French prospect with verified legal data
 
 ## Quand utiliser
 
-**Systématiquement après le discovery Google Places**, pour chaque
-prospect français. Récupère :
+**Source primaire** pour identifier dirigeant + SIREN d'un prospect FR
+après le discovery Google Places. Recherche **fuzzy** par nom + ville
+— pratique mais peut renvoyer plusieurs résultats au même nom.
+
+Récupère :
 
 - **Prénom + nom du dirigeant** (gérant, président, etc.) — clé pour
   personnaliser l'approche commerciale
@@ -18,6 +21,25 @@ prospect français. Récupère :
 - **Date de création** (ancienneté = signal de stabilité)
 
 **100% gratuit, pas d'auth, source officielle data.gouv.fr.**
+
+### Chaîne complète d'enrichissement officiel
+
+Cette skill est la **première étape** d'une chaîne qui peut continuer
+si besoin :
+
+1. **`prospection-enrichment-gouv`** (cette skill) — fuzzy par nom + ville
+2. **[`prospection-sirene`](../prospection-sirene/SKILL.md)** — fallback
+   strict par SIRET via INSEE Sirene v3 (si l'étape 1 ne matche pas
+   clairement, ou pour valider un SIRET trouvé en mentions légales)
+3. **[`prospection-pappers`](../prospection-pappers/SKILL.md)** —
+   complément Budget si `PAPPERS_API_KEY` présent (CA déclaré, capital,
+   effectif réel, dirigeants secondaires)
+
+Les trois skills écrivent dans des sous-clés isolées de `raw_payload`
+(`raw_payload.sirene`, `raw_payload.pappers`) pour ne pas se marcher
+dessus. Cette skill-ci écrit dans les colonnes du lead
+(`first_name`, `last_name`, `role`, `company_name`) et dans les clés
+racine de `raw_payload` (`siret`, `siren`, `headcount`, `date_creation`).
 
 ## Endpoint
 
@@ -128,6 +150,10 @@ qu'on a la bonne :
   Google Places.
 - Les dirigeants `personne morale` (= société qui dirige une autre
   société) ne donnent pas de prénom/nom utiles → mets NULL.
+- **Fuzzy par nom** : peut renvoyer plusieurs entreprises au même nom
+  commercial. Si match flou → bascule sur
+  [`prospection-sirene`](../prospection-sirene/SKILL.md) en fallback
+  strict (par SIRET).
 
 ## Bonnes pratiques
 
