@@ -36,6 +36,13 @@ import {
   Loader,
   Trophy,
   ArrowRight,
+  MapPin,
+  Building2,
+  FileText,
+  Briefcase,
+  Globe,
+  BookText,
+  ExternalLink as ExternalLinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -415,6 +422,8 @@ export function LeadDrawer({
               )}
             </Section>
 
+            <ExternalLinksSection lead={lead} />
+
             <Section title="Qualification">
               <FieldRow label="Assigné à">
                 <InlinePicker
@@ -636,6 +645,137 @@ function SectionSkeleton() {
       <Loader className="h-3 w-3 animate-spin" />
       Chargement…
     </div>
+  );
+}
+
+// ============================================================
+// External links — Google Maps, Societe.com, Pappers, LinkedIn,
+// Site web, Pages Jaunes. Construits à la volée depuis raw_payload
+// + colonnes du lead. N'affiche que les liens où la donnée existe.
+// ============================================================
+
+type ExternalLinkItem = {
+  id: string;
+  url: string;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+};
+
+function buildExternalLinks(lead: LeadWithDedup): ExternalLinkItem[] {
+  const items: ExternalLinkItem[] = [];
+  const payload = (lead.raw_payload ?? {}) as Record<string, unknown>;
+
+  // 1. Google Maps — URL canonique si dispo, sinon construction depuis place_id
+  const gmapsUrl =
+    typeof payload.google_maps_url === "string"
+      ? payload.google_maps_url
+      : null;
+  const placeId =
+    typeof payload.place_id === "string" ? payload.place_id : null;
+  if (gmapsUrl) {
+    items.push({
+      id: "gmaps",
+      url: gmapsUrl,
+      label: "Google Maps",
+      Icon: MapPin,
+    });
+  } else if (placeId) {
+    const cleanedId = placeId.startsWith("places/") ? placeId.slice(7) : placeId;
+    items.push({
+      id: "gmaps",
+      url: `https://www.google.com/maps/place/?q=place_id:${cleanedId}`,
+      label: "Google Maps",
+      Icon: MapPin,
+    });
+  }
+
+  // 2 & 3. Societe.com + Pappers — depuis SIREN
+  const siren = typeof payload.siren === "string" ? payload.siren : null;
+  if (siren) {
+    items.push({
+      id: "societe",
+      url: `https://www.societe.com/cgi-bin/search?champs=${siren}`,
+      label: "Societe.com",
+      Icon: Building2,
+    });
+    items.push({
+      id: "pappers",
+      url: `https://www.pappers.fr/entreprise/${siren}`,
+      label: "Pappers",
+      Icon: FileText,
+    });
+  }
+
+  // 4. LinkedIn dirigeant — URL directe depuis raw_payload
+  const linkedin =
+    typeof payload.linkedin === "string" ? payload.linkedin : null;
+  if (linkedin) {
+    items.push({
+      id: "linkedin",
+      url: linkedin,
+      label: "LinkedIn dirigeant",
+      Icon: Briefcase,
+    });
+  }
+
+  // 5. Site web — depuis raw_payload.website ou company_domain
+  const websiteRaw =
+    typeof payload.website === "string" ? payload.website : null;
+  const fallbackDomain = lead.company_domain;
+  const finalWebsite = websiteRaw ?? fallbackDomain;
+  if (finalWebsite) {
+    const normalized = /^https?:\/\//i.test(finalWebsite)
+      ? finalWebsite
+      : `https://${finalWebsite}`;
+    items.push({
+      id: "website",
+      url: normalized,
+      label: "Site web",
+      Icon: Globe,
+    });
+  }
+
+  // 6. Pages Jaunes — depuis nom + ville
+  const location =
+    typeof payload.location === "string" ? payload.location : null;
+  if (lead.company_name && location) {
+    const params = new URLSearchParams({
+      quoiqui: lead.company_name,
+      ou: location,
+    });
+    items.push({
+      id: "pagesjaunes",
+      url: `https://www.pagesjaunes.fr/recherche/?${params.toString()}`,
+      label: "Pages Jaunes",
+      Icon: BookText,
+    });
+  }
+
+  return items;
+}
+
+function ExternalLinksSection({ lead }: { lead: LeadWithDedup }) {
+  const items = buildExternalLinks(lead);
+  if (items.length === 0) return null;
+
+  return (
+    <Section title="Liens externes">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+        {items.map(({ id, url, label, Icon }) => (
+          <a
+            key={id}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-[var(--muted)]/30 hover:text-accent transition-colors rounded-sm border border-transparent hover:border-[var(--border)]"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="flex-1 truncate">{label}</span>
+            <ExternalLinkIcon className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+          </a>
+        ))}
+      </div>
+    </Section>
   );
 }
 

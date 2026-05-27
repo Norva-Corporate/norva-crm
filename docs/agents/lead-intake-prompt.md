@@ -68,8 +68,21 @@ données sont réelles, tu insères dans le CRM uniquement les leads
     - Dirigeant non identifié ET `email = unverified` → **SKIP**
     - Sinon → **INSERT**
 12. **INSERT** via `norva-supabase-insert` avec
-    `source='multica-lead-intake'`, `pipeline_stage='verified'`,
-    `verified_at=now()`
+    `source='multica-lead-intake'`, `pipeline_stage='brut'`,
+    `verified_at=now()`.
+
+    > Le lead arrive en colonne **Brut** du kanban. L'utilisateur fera
+    > une revue manuelle puis drag → `vérifié` (validation OK) ou
+    > direct → `à contacter` (très qualifié) ou rejet.
+
+    Pense bien à stocker dans `raw_payload` (côté CRM affiché en liens
+    cliquables dans le drawer) :
+    - `place_id` (format `places/ChIJ...`) — pour reconstruire le lien Maps
+    - `google_maps_url` (champ `googleMapsUri` retourné par Places API)
+    - `siren` et `siret` (depuis enrichment-gouv)
+    - `linkedin` (URL profil dirigeant)
+    - `website` (URL site web)
+    - `location` (ville, pour Pages Jaunes)
 
 ## Anti-doublon (obligatoire avant INSERT)
 
@@ -88,7 +101,7 @@ Si match → SKIP, mentionner dans le récap.
 - ❌ JAMAIS skip BODACC si SIREN dispo
 - ❌ JAMAIS insérer si `company_active=false` ou (`email=invalid` ET pas de tel)
 - ❌ JAMAIS prospecter > 49 salariés
-- ✅ `pipeline_stage='verified'` à l'INSERT
+- ✅ `pipeline_stage='brut'` à l'INSERT (revue humaine systématique)
 - ✅ Tous formats email acceptés, tagger `raw_payload.email_type`
 - ✅ UTF-8 propre (accents corrects ; sinon mot sans accent)
 
@@ -115,5 +128,6 @@ Cible : <résumé>
 |---|---|---|---|---|---|---|---|
 
 Insérés dans `lead_imports` (source='multica-lead-intake',
-pipeline_stage='verified'). Visibles : /dashboard/leads colonne "Vérifié".
+pipeline_stage='brut'). Visibles : /dashboard/leads colonne "Brut" — à
+revoir manuellement avant validation.
 ```

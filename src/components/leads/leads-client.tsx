@@ -63,14 +63,37 @@ const STATUS_CONFIG: Record<
   duplicate: { label: "Doublon", variant: "warning" },
 };
 
-type TabKey = "pending" | "qualified" | "all" | "converted" | "dismissed";
+// Onglets de la vue Liste alignés sur les colonnes du kanban
+// (pipeline_stage) + 3 onglets dérivés du status legacy (all/converted/dismissed).
+type TabKey =
+  | "brut"
+  | "verified"
+  | "to_contact"
+  | "contacted"
+  | "in_discussion"
+  | "all"
+  | "converted"
+  | "dismissed";
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "pending", label: "À traiter" },
-  { key: "qualified", label: "Qualifiés" },
+  { key: "brut", label: "Brut" },
+  { key: "verified", label: "Vérifié" },
+  { key: "to_contact", label: "À contacter" },
+  { key: "contacted", label: "Contacté" },
+  { key: "in_discussion", label: "En discussion" },
   { key: "all", label: "Tous" },
   { key: "converted", label: "Convertis" },
   { key: "dismissed", label: "Rejetés" },
+];
+
+// Pipeline stages = leads actifs (status pending ou qualified).
+// Les autres clés de tab sont gérées séparément (terminaux).
+const PIPELINE_STAGE_TABS: TabKey[] = [
+  "brut",
+  "verified",
+  "to_contact",
+  "contacted",
+  "in_discussion",
 ];
 
 interface Props {
@@ -84,7 +107,7 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
   const [view, setView] = useState<ViewMode>("kanban");
   // Local state for optimistic updates (drag & drop)
   const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
-  const [tab, setTab] = useState<TabKey>("pending");
+  const [tab, setTab] = useState<TabKey>("brut");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<LeadFilters>(DEFAULT_LEAD_FILTERS);
   const [sortBy, setSortBy] = useState<LeadSortBy>(DEFAULT_SORT);
@@ -121,13 +144,23 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const matchedLeads = leads.filter((l) => {
-      const matchesTab =
-        tab === "all" ||
-        (tab === "pending" && l.status === "pending") ||
-        (tab === "qualified" && l.status === "qualified") ||
-        (tab === "converted" &&
-          (l.status === "converted" || l.status === "duplicate")) ||
-        (tab === "dismissed" && l.status === "dismissed");
+      // Onglets pipeline_stage (brut/vérifié/à contacter/contacté/en discussion) :
+      // ne montre que les leads non-terminaux (pending ou qualified) dont le
+      // stage matche l'onglet.
+      // Onglets terminaux (converted/dismissed) : filtre par status.
+      // Onglet "all" : tout, peu importe stage ou status.
+      let matchesTab = false;
+      if (tab === "all") {
+        matchesTab = true;
+      } else if (tab === "converted") {
+        matchesTab = l.status === "converted" || l.status === "duplicate";
+      } else if (tab === "dismissed") {
+        matchesTab = l.status === "dismissed";
+      } else if (PIPELINE_STAGE_TABS.includes(tab)) {
+        matchesTab =
+          (l.status === "pending" || l.status === "qualified") &&
+          l.pipeline_stage === tab;
+      }
       const matchesSearch =
         !q ||
         l.email?.toLowerCase().includes(q) ||
