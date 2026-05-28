@@ -133,8 +133,7 @@ export async function getReportData(): Promise<ReportData> {
 
   // ----- Pipeline by stage
   const STAGES = [
-    "prospect",
-    "qualified",
+    "discussion",
     "proposal",
     "negotiation",
     "won",

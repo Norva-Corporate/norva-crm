@@ -56,8 +56,7 @@ interface Props {
 }
 
 const stageLabels: Record<DealStage, string> = {
-  prospect: "Prospect",
-  qualified: "Qualifié",
+  discussion: "Discussion",
   proposal: "Proposition",
   negotiation: "Négociation",
   won: "Gagné",

@@ -24,8 +24,7 @@ const stageBadgeMap: Record<
   string,
   React.ComponentProps<typeof Badge>["variant"]
 > = {
-  prospect: "prospect",
-  qualified: "qualified",
+  discussion: "discussion",
   proposal: "proposal",
   negotiation: "negotiation",
   won: "won",
@@ -33,8 +32,7 @@ const stageBadgeMap: Record<
 };
 
 const stageLabel: Record<string, string> = {
-  prospect: "Prospect",
-  qualified: "Qualifié",
+  discussion: "Discussion",
   proposal: "Devis",
   negotiation: "Négo.",
   won: "Gagné",

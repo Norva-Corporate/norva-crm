@@ -51,15 +51,15 @@ export function KanbanBoard({
 
   const dealsByStage = useMemo(() => {
     const acc: Record<DealStage, DealWithRelations[]> = {
-      prospect: [],
-      qualified: [],
+      discussion: [],
       proposal: [],
       negotiation: [],
       won: [],
       lost: [],
     };
     for (const d of deals) {
-      acc[d.stage].push(d);
+      const bucket = acc[d.stage];
+      if (bucket) bucket.push(d);
     }
     return acc;
   }, [deals]);
@@ -96,7 +96,7 @@ export function KanbanBoard({
     let targetStage: DealStage | null = null;
     if (
       (
-        ["prospect", "qualified", "proposal", "negotiation", "won", "lost"] as DealStage[]
+        ["discussion", "proposal", "negotiation", "won", "lost"] as DealStage[]
       ).includes(overId as DealStage)
     ) {
       targetStage = overId as DealStage;

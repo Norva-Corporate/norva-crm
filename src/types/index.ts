@@ -41,8 +41,7 @@ export interface Contact {
 }
 
 export type DealStage =
-  | "prospect"
-  | "qualified"
+  | "discussion"
   | "proposal"
   | "negotiation"
   | "won"

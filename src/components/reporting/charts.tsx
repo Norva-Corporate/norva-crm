@@ -89,8 +89,7 @@ export function MonthlyRevenueChart({
 // Horizontal bar — pipeline by stage (value)
 // ============================================================
 const STAGE_LABELS: Record<string, string> = {
-  prospect: "Prospect",
-  qualified: "Qualifié",
+  discussion: "Discussion",
   proposal: "Devis",
   negotiation: "Négociation",
   won: "Gagné",
@@ -98,8 +97,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_COLORS: Record<string, string> = {
-  prospect: "#6366F1",
-  qualified: "#3B82F6",
+  discussion: "#6366F1",
   proposal: "#F59E0B",
   negotiation: "#F97316",
   won: "#22C55E",
@@ -157,8 +155,7 @@ export function ConversionFunnel({
 }) {
   const max = Math.max(1, ...data.map((d) => d.count));
   const order = [
-    "prospect",
-    "qualified",
+    "discussion",
     "proposal",
     "negotiation",
     "won",

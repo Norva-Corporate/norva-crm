@@ -6,12 +6,11 @@ export interface StageDef {
   /** Couleur d'accent (hex) — utilisé pour les badges et bordures */
   accent: string;
   /** Variant du Badge */
-  badgeVariant: "prospect" | "qualified" | "proposal" | "negotiation" | "won" | "lost";
+  badgeVariant: "discussion" | "proposal" | "negotiation" | "won" | "lost";
 }
 
 export const STAGES: StageDef[] = [
-  { key: "prospect", label: "Prospect", accent: "#6366F1", badgeVariant: "prospect" },
-  { key: "qualified", label: "Qualifié", accent: "#3B82F6", badgeVariant: "qualified" },
+  { key: "discussion", label: "Discussion", accent: "#6366F1", badgeVariant: "discussion" },
   { key: "proposal", label: "Devis envoyé", accent: "#F59E0B", badgeVariant: "proposal" },
   { key: "negotiation", label: "Négociation", accent: "#F97316", badgeVariant: "negotiation" },
   { key: "won", label: "Gagné", accent: "#22C55E", badgeVariant: "won" },
@@ -24,8 +23,7 @@ export function getStage(key: DealStage): StageDef {
 
 /** Stages "ouverts" (qui comptent dans le pipeline value) */
 export const OPEN_STAGES: DealStage[] = [
-  "prospect",
-  "qualified",
+  "discussion",
   "proposal",
   "negotiation",
 ];

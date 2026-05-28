@@ -87,7 +87,7 @@ interface FormState {
 const empty: FormState = {
   title: "",
   value: "",
-  stage: "prospect",
+  stage: "discussion",
   probability: "",
   expected_close_date: "",
   contact_id: "",
@@ -161,7 +161,7 @@ export function DealDrawer({
         notes: deal.notes ?? "",
       });
     } else {
-      setForm({ ...empty, stage: defaultStage ?? "prospect" });
+      setForm({ ...empty, stage: defaultStage ?? "discussion" });
     }
   }, [open, deal, defaultStage]);
 

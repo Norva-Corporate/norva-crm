@@ -48,12 +48,15 @@ const MANUAL_ICON: Record<ManualType, React.ComponentType<{ className?: string }
 };
 
 const STAGE_LABELS: Record<string, string> = {
-  prospect: "Prospect",
-  qualified: "Qualifié",
+  discussion: "Discussion",
   proposal: "Devis",
   negotiation: "Négociation",
   won: "Gagné",
   lost: "Perdu",
+  // Legacy values — gardées pour le rendu des activités historiques
+  // (deal_stage_changed) avant la refonte 029.
+  prospect: "Prospect",
+  qualified: "Qualifié",
 };
 
 const PROJECT_STATUS_LABELS: Record<string, string> = {

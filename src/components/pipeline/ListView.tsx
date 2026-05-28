@@ -406,14 +406,13 @@ function sortValue(deal: DealWithRelations, key: SortKey): string | number {
       return deal.value ?? -Infinity;
     case "stage": {
       const order: Record<DealStage, number> = {
-        prospect: 0,
-        qualified: 1,
-        proposal: 2,
-        negotiation: 3,
-        won: 4,
-        lost: 5,
+        discussion: 0,
+        proposal: 1,
+        negotiation: 2,
+        won: 3,
+        lost: 4,
       };
-      return order[deal.stage];
+      return order[deal.stage] ?? 99;
     }
     case "expected_close_date":
       return deal.expected_close_date

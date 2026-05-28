@@ -28,8 +28,7 @@ const DEAL_SELECT =
   "*, contact:contacts(id, first_name, last_name), company:companies(id, name), assignee:profiles!deals_assigned_to_fkey(id, full_name, email, avatar_url, role, created_at, updated_at), source_lead:lead_imports!deals_source_lead_id_fkey(id, first_name, last_name, company_name)";
 
 const VALID_STAGES: DealStage[] = [
-  "prospect",
-  "qualified",
+  "discussion",
   "proposal",
   "negotiation",
   "won",
@@ -83,7 +82,7 @@ export async function createDeal(
     return { success: false, error: "Le titre est obligatoire." };
   }
 
-  const stage = data.stage ?? "prospect";
+  const stage = data.stage ?? "discussion";
   if (!VALID_STAGES.includes(stage)) {
     return { success: false, error: "Étape invalide." };
   }

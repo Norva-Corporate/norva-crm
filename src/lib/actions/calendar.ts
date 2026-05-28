@@ -77,8 +77,7 @@ export async function getCalendarEvents(
   }
 
   const STAGE_COLOR: Record<string, string> = {
-    prospect: "#6366F1",
-    qualified: "#3B82F6",
+    discussion: "#6366F1",
     proposal: "#F59E0B",
     negotiation: "#F97316",
     won: "#22C55E",

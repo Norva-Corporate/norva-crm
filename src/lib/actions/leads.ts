@@ -673,7 +673,7 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
 /**
  * Convertit un lead "en discussion" en pipeline complet : crée le
  * contact + la company (via convertLead), puis crée un deal lié en
- * stage `prospect`. Sert le bouton "→ Créer deal" depuis la card
+ * stage `discussion`. Sert le bouton "→ Créer deal" depuis la card
  * kanban quand le prospect a répondu.
  */
 export async function convertLeadToDeal(
@@ -729,7 +729,7 @@ export async function convertLeadToDeal(
     .from("deals")
     .insert({
       title: dealTitle,
-      stage: "prospect",
+      stage: "discussion",
       contact_id,
       company_id,
       value: dealValue,

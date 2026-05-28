@@ -84,8 +84,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
           }).format(Number(d.value))
         : null;
     const stageLabel: Record<string, string> = {
-      prospect: "Prospect",
-      qualified: "Qualifié",
+      discussion: "Discussion",
       proposal: "Devis",
       negotiation: "Négo.",
       won: "Gagné",
