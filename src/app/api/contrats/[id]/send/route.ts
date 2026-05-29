@@ -8,13 +8,15 @@ import {
 } from "@/lib/contrats/generate-pdf";
 import { insertContratActivity } from "@/lib/contrats/server";
 import {
-  activateSignatureRequest,
-  addDocument,
-  addSigner,
-  createSignatureRequest,
-  YousignError,
-} from "@/lib/yousign";
-import type { ContratClientSnapshot } from "@/lib/contrats/template";
+  createSubmission,
+  createTemplateFromPdf,
+  DocusealError,
+} from "@/lib/docuseal";
+import {
+  CONTRAT_SIGNATURE_AREA,
+  CONTRAT_SIGNATURE_PAGE_INDEX,
+  type ContratClientSnapshot,
+} from "@/lib/contrats/template";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,7 +87,7 @@ export async function POST(
   const { data: contrat, error } = await service
     .from("contrats")
     .select(
-      "id, ref, statut, client_snapshot, pdf_path, yousign_signature_request_id"
+      "id, ref, statut, client_snapshot, pdf_path, docuseal_submission_id"
     )
     .eq("id", id)
     .maybeSingle();
@@ -130,37 +132,43 @@ export async function POST(
   const pdfBuffer = Buffer.from(await stored.arrayBuffer());
 
   try {
-    const sr = await createSignatureRequest({
+    // 1. Upload du PDF comme template DocuSeal (avec champ signature
+    //    placé sur la dernière page, colonne droite).
+    const filename = contratPdfFilename({ id: contrat.id, ref: contrat.ref });
+    const template = await createTemplateFromPdf({
       name: `Contrat ${contrat.ref} — ${client.raison_sociale}`,
-      delivery_mode: "email",
-      timezone: "Europe/Paris",
+      pdfBuffer,
+      filename,
+      fields: [
+        {
+          name: "Signature",
+          type: "signature",
+          required: true,
+          areas: [
+            {
+              page: CONTRAT_SIGNATURE_PAGE_INDEX,
+              x: CONTRAT_SIGNATURE_AREA.x,
+              y: CONTRAT_SIGNATURE_AREA.y,
+              w: CONTRAT_SIGNATURE_AREA.w,
+              h: CONTRAT_SIGNATURE_AREA.h,
+            },
+          ],
+        },
+      ],
     });
 
-    const doc = await addDocument(sr.id, pdfBuffer, {
-      nature: "signable_document",
-      parse_anchors: true,
-      filename: contratPdfFilename({ id: contrat.id, ref: contrat.ref }),
+    // 2. Création de la submission → DocuSeal envoie l'email au signataire
+    const fullName = `${signer.first_name} ${signer.last_name}`.trim();
+    const submitter = await createSubmission({
+      templateId: template.id,
+      signer: {
+        email: signer.email,
+        name: fullName || undefined,
+        phone: signer.phone_number,
+        role: "Client",
+      },
+      sendEmail: true,
     });
-
-    // Si l'ancre {{signature}} a été détectée par Yousign, on lie le
-    // signataire à ce field. Sinon on laisse Yousign placer un field
-    // par défaut.
-    const fields = (doc.fields ?? [])
-      .filter((f) => f.type === "signature")
-      .map((f) => ({
-        document_id: doc.id,
-        type: "signature" as const,
-        field_id: f.id,
-      }));
-
-    const signerCreated = await addSigner(sr.id, {
-      info: signer,
-      signature_level: "electronic_signature",
-      signature_authentication_mode: "otp_email",
-      fields,
-    });
-
-    await activateSignatureRequest(sr.id);
 
     const now = new Date();
     const expiresAt = new Date(
@@ -171,8 +179,8 @@ export async function POST(
       .from("contrats")
       .update({
         statut: "envoye",
-        yousign_signature_request_id: sr.id,
-        yousign_signer_id: signerCreated.id,
+        docuseal_submission_id: String(submitter.submission_id),
+        docuseal_submitter_id: String(submitter.id),
         sent_at: now.toISOString(),
         expires_at: expiresAt.toISOString(),
       })
@@ -185,7 +193,8 @@ export async function POST(
       {
         ref: contrat.ref,
         signer_email: signer.email,
-        yousign_signature_request_id: sr.id,
+        docuseal_submission_id: submitter.submission_id,
+        docuseal_submitter_id: submitter.id,
         expires_at: expiresAt.toISOString(),
       },
       user.id
@@ -193,7 +202,7 @@ export async function POST(
 
     return NextResponse.json({ statut: "envoye" });
   } catch (err) {
-    if (err instanceof YousignError) {
+    if (err instanceof DocusealError) {
       return NextResponse.json(
         { error: err.message, code: err.code },
         { status: err.status >= 400 && err.status < 600 ? err.status : 502 }
@@ -202,7 +211,7 @@ export async function POST(
     console.error("[contrats/send] error:", err);
     return NextResponse.json(
       {
-        error: "Erreur Yousign",
+        error: "Erreur DocuSeal",
         detail: err instanceof Error ? err.message : String(err),
       },
       { status: 500 }

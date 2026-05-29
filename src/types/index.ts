@@ -493,8 +493,8 @@ export interface Contrat {
   acompte: number;
   solde: number;
   statut: ContratStatut;
-  yousign_signature_request_id: string | null;
-  yousign_signer_id: string | null;
+  docuseal_submission_id: string | null;
+  docuseal_submitter_id: string | null;
   pdf_path: string | null;
   signed_pdf_path: string | null;
   proof_path: string | null;

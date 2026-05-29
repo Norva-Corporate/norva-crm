@@ -2,6 +2,27 @@
 // Modifier ici pour faire évoluer les clauses : le PDF se régénère à
 // chaque génération depuis ce template.
 
+// ── Structure du PDF généré ─────────────────────────────────
+// 1 page de garde (cover) + N articles (1 page chacun) + 1 page
+// signature finale. La signature client est placée dans le bloc
+// droit de la dernière page (coordonnées normalisées 0..1 utilisées
+// par DocuSeal). Si tu ajoutes/retires des articles dans buildSections,
+// le PAGE_COUNT s'adapte automatiquement — le SIGNATURE_PAGE_INDEX est
+// toujours `PAGE_COUNT - 1` (la dernière page).
+export const CONTRAT_ARTICLE_COUNT = 11;
+export const CONTRAT_PAGE_COUNT = 1 /* cover */ + CONTRAT_ARTICLE_COUNT + 1; /* signature */
+export const CONTRAT_SIGNATURE_PAGE_INDEX = CONTRAT_PAGE_COUNT - 1;
+
+// Bloc signature client = colonne droite de la dernière page.
+// .sign-page padding 18mm x 22mm ; .sign-grid 2 colonnes égales avec
+// 12mm de gap → col droite à x=111mm, w=77mm, y signature ≈ 195mm.
+export const CONTRAT_SIGNATURE_AREA = {
+  x: 0.53, // 111mm / 210mm
+  y: 0.66, // 195mm / 297mm — sous le label "Le Client"
+  w: 0.37, // 77mm / 210mm
+  h: 0.10, // 30mm / 297mm
+} as const;
+
 export interface ContratOptions {
   site: boolean;
   maintenance: boolean;

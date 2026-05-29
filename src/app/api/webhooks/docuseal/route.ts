@@ -9,10 +9,9 @@ import {
 import { insertContratActivity } from "@/lib/contrats/server";
 import type { ContratActivityType } from "@/lib/contrats/server";
 import {
-  downloadAuditTrail,
-  downloadSignedDocument,
-  fetchSignatureRequest,
-} from "@/lib/yousign";
+  downloadAuditLog,
+  downloadSignedPdf,
+} from "@/lib/docuseal";
 import {
   sendContratSignedClient,
   sendContratSignedInternal,
@@ -27,15 +26,15 @@ const BUCKET = "contrats";
 
 function readSignatureHeader(req: Request): string {
   const h =
-    req.headers.get("x-yousign-signature-256") ??
-    req.headers.get("X-Yousign-Signature-256") ??
+    req.headers.get("x-docuseal-signature") ??
+    req.headers.get("X-Docuseal-Signature") ??
+    req.headers.get("X-DocuSeal-Signature") ??
     "";
   return h.replace(/^sha256=/i, "").trim();
 }
 
 function timingSafeEqualHex(aHex: string, bHex: string): boolean {
   if (!aHex || !bHex) return false;
-  // length first to short-circuit
   if (aHex.length !== bHex.length) return false;
   try {
     const a = Buffer.from(aHex, "hex");
@@ -47,43 +46,54 @@ function timingSafeEqualHex(aHex: string, bHex: string): boolean {
   }
 }
 
-interface YousignWebhookPayload {
-  // Le nom exact du champ d'event id peut varier ; on tente plusieurs clés
-  // pour rester résilient à des évolutions mineures de la doc v3.
-  id?: string;
-  event_id?: string;
-  event_name?: string;
-  type?: string;
+interface DocusealWebhookPayload {
+  event_type?: string;
+  timestamp?: string;
   data?: {
-    signature_request?: {
-      id?: string;
-      status?: string;
-    };
-    signer?: {
-      id?: string;
-      status?: string;
-    };
+    id?: number;
+    submission_id?: number;
+    status?: string;
+    audit_log_url?: string | null;
+    combined_document_url?: string | null;
+    submitters?: Array<{
+      id: number;
+      submission_id: number;
+      status: string;
+      documents?: Array<{ name: string; url: string }>;
+    }>;
+    documents?: Array<{ name: string; url: string }>;
   };
 }
 
-function extractEventId(payload: YousignWebhookPayload): string | null {
-  return payload.event_id ?? payload.id ?? null;
+// Extrait l'ID submission selon que l'event porte sur la submission
+// elle-même (submission.*) ou sur un submitter (form.*).
+function extractSubmissionId(p: DocusealWebhookPayload): number | null {
+  const d = p.data;
+  if (!d) return null;
+  if (p.event_type?.startsWith("submission.")) return d.id ?? null;
+  if (p.event_type?.startsWith("form.")) return d.submission_id ?? d.id ?? null;
+  return d.submission_id ?? d.id ?? null;
 }
-function extractEventName(payload: YousignWebhookPayload): string | null {
-  return payload.event_name ?? payload.type ?? null;
+
+// Identifiant déterministe pour dédupliquer un même event reçu deux
+// fois (retry DocuSeal). On combine event_type + l'id de l'objet
+// concerné — chaque transition d'état n'est émise qu'une fois.
+function buildEventKey(p: DocusealWebhookPayload): string | null {
+  if (!p.event_type || !p.data?.id) return null;
+  return `${p.event_type}:${p.data.id}`;
 }
 
 export async function POST(req: Request) {
-  const secret = process.env.YOUSIGN_WEBHOOK_SECRET ?? "";
+  const secret = process.env.DOCUSEAL_WEBHOOK_SECRET ?? "";
   if (!secret) {
-    console.error("[webhook/yousign] missing YOUSIGN_WEBHOOK_SECRET env");
+    console.error("[webhook/docuseal] missing DOCUSEAL_WEBHOOK_SECRET env");
     return NextResponse.json(
       { error: "server misconfigured" },
       { status: 500 }
     );
   }
 
-  // 1. Raw body avant tout parse JSON
+  // 1. Raw body avant tout parse JSON (le HMAC se calcule dessus)
   const raw = await req.text();
 
   // 2. HMAC SHA256 timing-safe
@@ -97,21 +107,21 @@ export async function POST(req: Request) {
   }
 
   // 3. Parse JSON
-  let payload: YousignWebhookPayload;
+  let payload: DocusealWebhookPayload;
   try {
-    payload = JSON.parse(raw) as YousignWebhookPayload;
+    payload = JSON.parse(raw) as DocusealWebhookPayload;
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const eventId = extractEventId(payload);
-  const eventName = extractEventName(payload);
-  const signatureRequestId = payload.data?.signature_request?.id;
+  const eventKey = buildEventKey(payload);
+  const eventType = payload.event_type;
+  const submissionId = extractSubmissionId(payload);
 
-  if (!eventId || !eventName || !signatureRequestId) {
+  if (!eventKey || !eventType || !submissionId) {
     console.warn(
-      "[webhook/yousign] missing fields",
-      JSON.stringify({ eventId, eventName, signatureRequestId })
+      "[webhook/docuseal] missing fields",
+      JSON.stringify({ eventKey, eventType, submissionId })
     );
     return NextResponse.json({ ok: true });
   }
@@ -122,64 +132,60 @@ export async function POST(req: Request) {
   const { data: contrat, error: cErr } = await service
     .from("contrats")
     .select(
-      "id, ref, statut, signed_pdf_path, proof_path, client_snapshot, montant_total, created_by"
+      "id, ref, statut, signed_pdf_path, proof_path, client_snapshot, montant_total, created_by, docuseal_submission_id"
     )
-    .eq("yousign_signature_request_id", signatureRequestId)
+    .eq("docuseal_submission_id", String(submissionId))
     .maybeSingle();
   if (cErr) {
-    console.error("[webhook/yousign] contrat lookup error:", cErr);
+    console.error("[webhook/docuseal] contrat lookup error:", cErr);
     return NextResponse.json({ error: "lookup error" }, { status: 500 });
   }
   if (!contrat) {
-    // Inconnu — on log + 200 (Yousign n'aura pas à retry)
     console.warn(
-      "[webhook/yousign] no contrat for signature_request_id",
-      signatureRequestId
+      "[webhook/docuseal] no contrat for submission_id",
+      submissionId
     );
     return NextResponse.json({ ok: true });
   }
 
-  // 5. Idempotence : tenter d'insérer l'event ; si conflit → déjà traité
+  // 5. Idempotence : insertion conditionnelle, si conflit → déjà traité
   const { data: insertedEvent, error: insertErr } = await service
     .from("contrat_events")
     .upsert(
       {
         contrat_id: contrat.id,
-        yousign_event_id: eventId,
-        event_name: eventName,
+        docuseal_event_id: eventKey,
+        event_name: eventType,
         payload: payload as unknown as Record<string, unknown>,
       },
-      { onConflict: "yousign_event_id", ignoreDuplicates: true }
+      { onConflict: "docuseal_event_id", ignoreDuplicates: true }
     )
     .select("id")
     .maybeSingle();
   if (insertErr) {
-    console.error("[webhook/yousign] contrat_events insert error:", insertErr);
-    // 500 → Yousign retry
+    console.error("[webhook/docuseal] contrat_events insert error:", insertErr);
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }
   if (!insertedEvent) {
-    // Event déjà traité → idempotent 200
     return NextResponse.json({ ok: true, deduped: true });
   }
 
-  // 6. Routage par event_name
+  // 6. Routage par event_type
   try {
-    if (eventName === "signature_request.done") {
-      await handleSigned(service, contrat, signatureRequestId);
-    } else if (eventName === "signature_request.expired") {
+    if (eventType === "submission.completed") {
+      await handleSigned(service, contrat, submissionId);
+    } else if (eventType === "submission.expired") {
       await handleStatusChange(service, contrat, "expire", "contract_expired");
     } else if (
-      eventName === "signer.declined" ||
-      eventName === "signature_request.declined" ||
-      eventName === "signer.refused"
+      eventType === "form.declined" ||
+      eventType === "submission.declined"
     ) {
       await handleStatusChange(service, contrat, "refuse", "contract_refused");
     }
-    // signature_request.activated → log uniquement (déjà loggé via upsert event)
+    // submission.created / form.viewed / form.started / form.completed →
+    // loggés dans contrat_events uniquement (pas de transition de statut)
   } catch (err) {
-    console.error("[webhook/yousign] handler error:", err);
-    // 500 pour que Yousign retry. L'idempotence empêchera les doubles écritures.
+    console.error("[webhook/docuseal] handler error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
       { status: 500 }
@@ -212,30 +218,22 @@ async function handleSigned(
     client_snapshot: unknown;
     montant_total: number | string;
   },
-  signatureRequestId: string
+  submissionId: number
 ) {
-  // 1. Récupérer la liste des documents pour trouver le signable
-  const sr = await fetchSignatureRequest(signatureRequestId);
-  const signable = sr.documents?.find(
-    (d) => !d.nature || d.nature === "signable_document"
-  );
-  if (!signable) {
-    throw new Error("No signable document on signature_request");
-  }
-
-  // 2. Télécharger PDF signé + dossier de preuve
-  const signedPdf = await downloadSignedDocument(signatureRequestId, signable.id);
+  // 1. Télécharger le PDF signé combiné + le dossier de preuve.
+  //    downloadSignedPdf lit la submission, suit combined_document_url.
+  const signedPdf = await downloadSignedPdf(submissionId);
   let proof: Buffer | null = null;
   try {
-    proof = await downloadAuditTrail(signatureRequestId);
+    proof = await downloadAuditLog(submissionId);
   } catch (err) {
     console.error(
-      "[webhook/yousign] downloadAuditTrail failed (continuing):",
+      "[webhook/docuseal] downloadAuditLog failed (continuing):",
       err
     );
   }
 
-  // 3. Upload Storage
+  // 2. Upload Storage
   const signedPath = contratSignedPdfStoragePath(contrat.id);
   const { error: upSignedErr } = await service.storage
     .from(BUCKET)
@@ -256,14 +254,14 @@ async function handleSigned(
       });
     if (upProofErr) {
       console.error(
-        "[webhook/yousign] proof upload failed:",
+        "[webhook/docuseal] proof upload failed:",
         upProofErr.message
       );
       proofPath = null;
     }
   }
 
-  // 4. Update contrat
+  // 3. Update contrat
   const signedAt = new Date().toISOString();
   await service
     .from("contrats")
@@ -281,7 +279,7 @@ async function handleSigned(
     proof_path: proofPath,
   });
 
-  // 5. Notifications MailerSend (fire-and-forget)
+  // 4. Notifications MailerSend (fire-and-forget)
   const client = contrat.client_snapshot as ContratClientSnapshot;
   const montant = Number(contrat.montant_total);
   const ctx = {
@@ -293,7 +291,7 @@ async function handleSigned(
   };
   await Promise.all([
     sendContratSignedInternal(ctx).catch((e) =>
-      console.error("[webhook/yousign] notif internal failed:", e)
+      console.error("[webhook/docuseal] notif internal failed:", e)
     ),
     sendContratSignedClient(
       ctx,
@@ -303,7 +301,7 @@ async function handleSigned(
         "-signe.pdf"
       )
     ).catch((e) =>
-      console.error("[webhook/yousign] notif client failed:", e)
+      console.error("[webhook/docuseal] notif client failed:", e)
     ),
   ]);
 }
