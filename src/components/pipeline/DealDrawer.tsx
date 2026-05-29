@@ -36,6 +36,7 @@ import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { AgentButton } from "@/components/agents/agent-button";
+import { ContratsSection } from "@/components/contrats/ContratsSection";
 import { Target } from "lucide-react";
 import type {
   CustomFieldWithValue,
@@ -593,6 +594,13 @@ export function DealDrawer({
                     <Ban className="h-3.5 w-3.5" />
                     Marquer perdu
                   </Button>
+                </div>
+              )}
+
+              {/* Contrats (édition uniquement) */}
+              {isEdit && deal?.id && (
+                <div className="pt-2 border-t border-[var(--border)]">
+                  <ContratsSection scope={{ type: "deal", id: deal.id }} />
                 </div>
               )}
 

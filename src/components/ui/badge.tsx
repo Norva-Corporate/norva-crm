@@ -18,6 +18,12 @@ const badgeVariants = cva(
         negotiation: "bg-[#F97316]/15 text-[#FB923C] border border-[#F97316]/30",
         won: "bg-[#22C55E]/15 text-[#4ADE80] border border-[#22C55E]/30",
         lost: "bg-[#EF4444]/15 text-[#F87171] border border-[#EF4444]/30",
+        // Contrats (Yousign)
+        contrat_genere: "bg-[var(--muted)] text-muted-foreground border border-[var(--border)]",
+        contrat_envoye: "bg-accent/15 text-accent border border-accent/30",
+        contrat_signe: "bg-success/15 text-success border border-success/30",
+        contrat_refuse: "bg-destructive/15 text-destructive border border-destructive/30",
+        contrat_expire: "bg-warning/15 text-warning border border-warning/30",
       },
     },
     defaultVariants: {

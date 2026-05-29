@@ -24,6 +24,7 @@ import { EntityTags } from "@/components/tags/entity-tags";
 import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { AgentButton } from "@/components/agents/agent-button";
 import { AgentTasksPanel } from "@/components/agents/agent-tasks-panel";
+import { ContratsSection } from "@/components/contrats/ContratsSection";
 import { Sparkles, Globe2 } from "lucide-react";
 import { deleteContact, patchContact, type ContactPatch } from "@/lib/actions/contacts";
 import { InlineText } from "@/components/ui/inline-text";
@@ -368,6 +369,10 @@ export function ContactDetailClient({
           entityId={contact.id}
           initialTasks={agentTasks}
         />
+
+        <Card className="p-5">
+          <ContratsSection scope={{ type: "contact", id: contact.id }} />
+        </Card>
 
         <CustomFieldsPanel
           entityType="contact"

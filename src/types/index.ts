@@ -230,6 +230,7 @@ export type ActivityEntityType =
   | "deal"
   | "project"
   | "invoice"
+  | "contrat"
   | "lead_import";
 
 export type ActivityType =
@@ -239,6 +240,11 @@ export type ActivityType =
   | "invoice_status_changed"
   | "project_created"
   | "project_status_changed"
+  | "contract_generated"
+  | "contract_sent"
+  | "contract_signed"
+  | "contract_refused"
+  | "contract_expired"
   | "note"
   | "call"
   | "meeting"
@@ -444,4 +450,56 @@ export interface CustomFieldValue {
 export interface CustomFieldWithValue extends CustomFieldDefinition {
   value: string | null;
   value_id: string | null;
+}
+
+// ============================================================
+// Contrats (signature électronique Yousign)
+// ============================================================
+
+export type ContratStatut =
+  | "brouillon"
+  | "genere"
+  | "envoye"
+  | "signe"
+  | "refuse"
+  | "expire";
+
+export interface ContratClientSnapshot {
+  raison_sociale: string;
+  siret: string;
+  email: string;
+  phone?: string | null;
+  representant?: string | null;
+  adresse?: string | null;
+}
+
+export interface ContratOptions {
+  site: boolean;
+  maintenance: boolean;
+  seo_ads: boolean;
+  social: boolean;
+}
+
+export interface Contrat {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  deal_id: string | null;
+  contact_id: string | null;
+  ref: string;
+  client_snapshot: ContratClientSnapshot;
+  options: ContratOptions;
+  montant_total: number;
+  acompte: number;
+  solde: number;
+  statut: ContratStatut;
+  yousign_signature_request_id: string | null;
+  yousign_signer_id: string | null;
+  pdf_path: string | null;
+  signed_pdf_path: string | null;
+  proof_path: string | null;
+  sent_at: string | null;
+  signed_at: string | null;
+  expires_at: string | null;
+  created_by: string;
 }
