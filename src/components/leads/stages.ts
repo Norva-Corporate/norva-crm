@@ -1,4 +1,5 @@
-import type { LeadPipelineStage } from "@/lib/actions/leads";
+import type { LeadAssignee, LeadPipelineStage } from "@/lib/actions/leads";
+import { TO_CONTACT_OWNERS, findOwnerByEmail } from "@/lib/team";
 
 export interface LeadStageDef {
   key: LeadPipelineStage;
@@ -45,6 +46,91 @@ export function getLeadStage(key: LeadPipelineStage): LeadStageDef {
 }
 
 export const LEAD_STAGE_KEYS = LEAD_STAGES.map((s) => s.key);
+
+// ============================================================
+// Board columns (vue kanban) — éclate `to_contact` en N sous-colonnes
+// nominatives (Kylian, Lohan, …) selon `TO_CONTACT_OWNERS`.
+// ============================================================
+
+export interface LeadBoardColumn {
+  /** Identifiant unique de la colonne, utilisé comme `useDroppable.id`. */
+  id: string;
+  label: string;
+  accent: string;
+  description: string;
+  /** Stage DB que la colonne représente. */
+  stage: LeadPipelineStage;
+  /** Profile.id assigné quand on drop dans cette colonne. Null = pas de split. */
+  assignedTo: string | null;
+}
+
+/**
+ * Construit la liste des colonnes effectivement affichées dans le kanban.
+ * `to_contact` est éclaté en une colonne par owner défini dans
+ * `TO_CONTACT_OWNERS` ET trouvé dans `profiles`. Les autres stages restent uniques.
+ */
+export function buildBoardColumns(
+  profiles: LeadAssignee[]
+): LeadBoardColumn[] {
+  const profileByEmail = new Map<string, LeadAssignee>();
+  for (const p of profiles) {
+    if (p.email) profileByEmail.set(p.email.toLowerCase(), p);
+  }
+
+  const columns: LeadBoardColumn[] = [];
+  for (const stage of LEAD_STAGES) {
+    if (stage.key !== "to_contact") {
+      columns.push({
+        id: stage.key,
+        label: stage.label,
+        accent: stage.accent,
+        description: stage.description,
+        stage: stage.key,
+        assignedTo: null,
+      });
+      continue;
+    }
+    // Split par owner
+    for (const owner of TO_CONTACT_OWNERS) {
+      const profile = profileByEmail.get(owner.email.toLowerCase());
+      if (!profile) continue;
+      columns.push({
+        id: `to_contact:${profile.id}`,
+        label: `${stage.label} — ${owner.shortName}`,
+        accent: owner.accent,
+        description: stage.description,
+        stage: "to_contact",
+        assignedTo: profile.id,
+      });
+    }
+  }
+  return columns;
+}
+
+/**
+ * Détermine la colonne qu'un lead doit occuper, à partir de son
+ * `pipeline_stage` et son `assigned_to`. Retourne null si aucune
+ * colonne ne matche (cas typique : `to_contact` sans assignation).
+ */
+export function getLeadBoardColumnId(
+  stage: LeadPipelineStage,
+  assignedTo: string | null,
+  columns: LeadBoardColumn[]
+): string | null {
+  if (stage !== "to_contact") return stage;
+  const col = columns.find(
+    (c) => c.stage === "to_contact" && c.assignedTo === assignedTo
+  );
+  return col?.id ?? null;
+}
+
+/**
+ * Récupère l'owner (Kylian/Lohan) associé à un lead via l'email du
+ * profile assigné. Utilisé pour afficher le badge d'owner sur la card.
+ */
+export function getLeadOwner(assignee: LeadAssignee | null) {
+  return findOwnerByEmail(assignee?.email);
+}
 
 // ============================================================
 // Quality helpers

@@ -74,6 +74,7 @@ export interface LeadImport {
 
 export interface LeadAssignee {
   id: string;
+  email: string | null;
   full_name: string | null;
   avatar_url: string | null;
 }
@@ -91,7 +92,7 @@ export async function listLeads(): Promise<LeadWithDedup[]> {
   const { data: leads } = await supabase
     .from("lead_imports")
     .select(
-      "*, assignee:profiles!lead_imports_assigned_to_fkey(id, full_name, avatar_url)"
+      "*, assignee:profiles!lead_imports_assigned_to_fkey(id, email, full_name, avatar_url)"
     )
     .order("imported_at", { ascending: false })
     .limit(200);
@@ -614,6 +615,70 @@ export async function updateLeadStage(
 }
 
 /**
+ * Variante de `updateLeadStage` qui patche aussi `assigned_to`.
+ * Utilisée par le drag & drop quand on dépose un lead sur une sous-colonne
+ * « À contacter — Kylian/Lohan » : il faut écrire à la fois le stage et
+ * l'owner en une seule mutation pour rester cohérent (pas de flash où le
+ * lead serait `to_contact` avec son ancien owner).
+ *
+ * Si `assignedTo` est null, on respecte ça (peut servir à déplacer un lead
+ * vers une autre colonne sans owner — pas utilisé aujourd'hui mais propre).
+ */
+export async function updateLeadStageAndAssignee(
+  leadId: string,
+  stage: LeadPipelineStage,
+  assignedTo: string | null
+): Promise<ActionResult> {
+  if (!VALID_PIPELINE_STAGES.includes(stage)) {
+    return { success: false, error: "Étape invalide." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const { data: lead } = await supabase
+    .from("lead_imports")
+    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage")
+    .eq("id", leadId)
+    .single();
+  if (!lead) return { success: false, error: "Lead introuvable." };
+  if (lead.status !== "pending" && lead.status !== "qualified") {
+    return {
+      success: false,
+      error: "Ce lead a déjà été converti, rejeté ou marqué doublon.",
+    };
+  }
+
+  const newStatus = stageToStatus(stage);
+  const { error } = await supabase
+    .from("lead_imports")
+    .update({
+      pipeline_stage: stage,
+      status: newStatus,
+      assigned_to: assignedTo,
+    })
+    .eq("id", leadId);
+  if (error) return { success: false, error: error.message };
+
+  // Crée la tâche auto liée au nouveau stage (avec le nouvel assignee)
+  if (lead.pipeline_stage !== stage) {
+    await createStageTask(
+      supabase,
+      { ...lead, assigned_to: assignedTo },
+      stage,
+      user.id
+    );
+  }
+
+  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/taches");
+  return { success: true, data: null };
+}
+
+/**
  * Mark a lead as qualified — only valid from 'pending'.
  * No-op if the lead is already in another state.
  *
@@ -797,7 +862,7 @@ export async function listProfilesLight(): Promise<LeadAssignee[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, avatar_url")
+    .select("id, email, full_name, avatar_url")
     .order("full_name", { ascending: true });
   return (data ?? []) as LeadAssignee[];
 }

@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { LeadsKanban } from "@/components/leads/LeadsKanban";
+import { buildBoardColumns } from "@/components/leads/stages";
 import {
   dismissLead,
   markLeadAsDuplicate,
@@ -63,38 +64,29 @@ const STATUS_CONFIG: Record<
   duplicate: { label: "Doublon", variant: "warning" },
 };
 
-// Onglets de la vue Liste alignés sur les colonnes du kanban
-// (pipeline_stage) + 3 onglets dérivés du status legacy (all/converted/dismissed).
-type TabKey =
-  | "brut"
-  | "verified"
-  | "to_contact"
-  | "contacted"
-  | "in_discussion"
-  | "all"
-  | "converted"
-  | "dismissed";
+// Onglets de la vue Liste alignés sur les colonnes du kanban (board columns,
+// pas pipeline_stage : « À contacter » est splittée par owner). On encode
+// les tabs « à contacter par owner » sous la forme "to_contact:<profileId>"
+// pour matcher l'id de colonne du kanban.
+type TabKey = string;
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "brut", label: "Brut" },
-  { key: "verified", label: "Vérifié" },
-  { key: "to_contact", label: "À contacter" },
-  { key: "contacted", label: "Contacté" },
-  { key: "in_discussion", label: "En discussion" },
+interface TabDef {
+  key: TabKey;
+  label: string;
+}
+
+const TERMINAL_TABS: TabDef[] = [
   { key: "all", label: "Tous" },
   { key: "converted", label: "Convertis" },
   { key: "dismissed", label: "Rejetés" },
 ];
 
-// Pipeline stages = leads actifs (status pending ou qualified).
-// Les autres clés de tab sont gérées séparément (terminaux).
-const PIPELINE_STAGE_TABS: TabKey[] = [
-  "brut",
-  "verified",
-  "to_contact",
-  "contacted",
-  "in_discussion",
-];
+function parseToContactTab(
+  key: TabKey
+): { stage: "to_contact"; assignedTo: string } | null {
+  if (!key.startsWith("to_contact:")) return null;
+  return { stage: "to_contact", assignedTo: key.slice("to_contact:".length) };
+}
 
 interface Props {
   leads: LeadWithDedup[];
@@ -107,6 +99,20 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
   const [view, setView] = useState<ViewMode>("kanban");
   // Local state for optimistic updates (drag & drop)
   const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
+  const boardColumns = useMemo(
+    () => buildBoardColumns(profiles),
+    [profiles]
+  );
+  // Onglets de la vue Liste : on dérive depuis les colonnes du kanban
+  // pour rester strictement alignés (y compris les sous-colonnes
+  // « À contacter — Kylian/Lohan »).
+  const tabs = useMemo<TabDef[]>(() => {
+    const fromBoard = boardColumns.map((c) => ({
+      key: c.id,
+      label: c.label,
+    }));
+    return [...fromBoard, ...TERMINAL_TABS];
+  }, [boardColumns]);
   const [tab, setTab] = useState<TabKey>("brut");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<LeadFilters>(DEFAULT_LEAD_FILTERS);
@@ -144,11 +150,9 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const matchedLeads = leads.filter((l) => {
-      // Onglets pipeline_stage (brut/vérifié/à contacter/contacté/en discussion) :
-      // ne montre que les leads non-terminaux (pending ou qualified) dont le
-      // stage matche l'onglet.
-      // Onglets terminaux (converted/dismissed) : filtre par status.
-      // Onglet "all" : tout, peu importe stage ou status.
+      // Onglets dérivés des board columns (incl. "to_contact:<profileId>") :
+      // statut non-terminal + stage qui matche + (optionnel) owner.
+      // Onglets terminaux (all/converted/dismissed) : filtre par status.
       let matchesTab = false;
       if (tab === "all") {
         matchesTab = true;
@@ -156,10 +160,18 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
         matchesTab = l.status === "converted" || l.status === "duplicate";
       } else if (tab === "dismissed") {
         matchesTab = l.status === "dismissed";
-      } else if (PIPELINE_STAGE_TABS.includes(tab)) {
-        matchesTab =
-          (l.status === "pending" || l.status === "qualified") &&
-          l.pipeline_stage === tab;
+      } else {
+        const toContact = parseToContactTab(tab);
+        if (toContact) {
+          matchesTab =
+            (l.status === "pending" || l.status === "qualified") &&
+            l.pipeline_stage === "to_contact" &&
+            l.assigned_to === toContact.assignedTo;
+        } else {
+          matchesTab =
+            (l.status === "pending" || l.status === "qualified") &&
+            l.pipeline_stage === tab;
+        }
       }
       const matchesSearch =
         !q ||
@@ -298,7 +310,7 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
           {/* Tabs (mode liste seulement) */}
           {view === "list" && (
             <div className="flex gap-1.5 flex-wrap">
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
@@ -370,6 +382,7 @@ export function LeadsClient({ leads: initialLeads, companies, profiles }: Props)
             ) : (
               <LeadsKanban
                 leads={kanbanLeads}
+                columns={boardColumns}
                 onLeadsChange={(updater) => setLeads(updater)}
                 onOpenLead={setSelected}
               />

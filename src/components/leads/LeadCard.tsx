@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { cn, formatRelativeDate } from "@/lib/utils";
 import {
   LEAD_STAGES,
+  getLeadOwner,
   getLeadStage,
   getQualityLevel,
   isRecommendedForContact,
@@ -106,6 +107,7 @@ export function LeadCard({
   const stageDef = getLeadStage(lead.pipeline_stage);
   const accentBorder = stageDef.accent;
   const qualityLevel = getQualityLevel(lead.quality_score);
+  const owner = getLeadOwner(lead.assignee);
   const recommended = isRecommendedForContact(
     lead.pipeline_stage,
     lead.quality_score
@@ -182,6 +184,19 @@ export function LeadCard({
               )}
             </div>
             <div className="shrink-0 flex items-center gap-1.5">
+              {owner && (
+                <span
+                  title={`Assigné à ${owner.shortName}`}
+                  className="inline-flex items-center justify-center h-4 w-4 text-[9px] font-mono font-bold uppercase rounded-full"
+                  style={{
+                    background: `${owner.accent}25`,
+                    color: owner.accent,
+                    border: `1px solid ${owner.accent}55`,
+                  }}
+                >
+                  {owner.shortName[0]}
+                </span>
+              )}
               {recommended && (
                 <span
                   title="Recommandé pour contact (qualité ≥ 80)"

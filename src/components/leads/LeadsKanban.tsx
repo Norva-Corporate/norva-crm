@@ -17,9 +17,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { LeadCard } from "./LeadCard";
-import { LEAD_STAGES, LEAD_STAGE_KEYS } from "./stages";
+import { getLeadBoardColumnId, type LeadBoardColumn } from "./stages";
 import { cn } from "@/lib/utils";
-import { updateLeadStage } from "@/lib/actions/leads";
+import {
+  updateLeadStage,
+  updateLeadStageAndAssignee,
+} from "@/lib/actions/leads";
 import { useIsMobile } from "@/hooks/use-media-query";
 import type {
   LeadPipelineStage,
@@ -28,6 +31,7 @@ import type {
 
 interface LeadsKanbanProps {
   leads: LeadWithDedup[];
+  columns: LeadBoardColumn[];
   onLeadsChange: (
     updater: (prev: LeadWithDedup[]) => LeadWithDedup[]
   ) => void;
@@ -36,6 +40,7 @@ interface LeadsKanbanProps {
 
 export function LeadsKanban({
   leads,
+  columns,
   onLeadsChange,
   onOpenLead,
 }: LeadsKanbanProps) {
@@ -49,19 +54,38 @@ export function LeadsKanban({
     })
   );
 
-  const leadsByStage = useMemo(() => {
-    const acc: Record<LeadPipelineStage, LeadWithDedup[]> = {
-      brut: [],
-      verified: [],
-      to_contact: [],
-      contacted: [],
-      in_discussion: [],
-    };
+  /**
+   * Bucket des leads par colonne. Pour `to_contact`, le bucket dépend de
+   * `assigned_to`. Les leads `to_contact` orphelins (assigned_to=null ou
+   * inconnu) sont rangés dans la 1re sous-colonne pour rester visibles —
+   * un UPDATE one-shot a normalement déjà tidy les leads pré-existants.
+   */
+  const leadsByColumn = useMemo(() => {
+    const acc: Record<string, LeadWithDedup[]> = {};
+    for (const c of columns) acc[c.id] = [];
+    const firstToContactColId =
+      columns.find((c) => c.stage === "to_contact")?.id ?? null;
+
     for (const l of leads) {
-      acc[l.pipeline_stage].push(l);
+      const colId = getLeadBoardColumnId(
+        l.pipeline_stage,
+        l.assigned_to,
+        columns
+      );
+      if (colId && acc[colId]) {
+        acc[colId].push(l);
+      } else if (l.pipeline_stage === "to_contact" && firstToContactColId) {
+        acc[firstToContactColId].push(l);
+      }
     }
     return acc;
-  }, [leads]);
+  }, [leads, columns]);
+
+  const columnById = useMemo(() => {
+    const m = new Map<string, LeadBoardColumn>();
+    for (const c of columns) m.set(c.id, c);
+    return m;
+  }, [columns]);
 
   function findLead(id: string): LeadWithDedup | undefined {
     return leads.find((l) => l.id === id);
@@ -92,32 +116,60 @@ export function LeadsKanban({
     const leadId = String(active.id);
     const overId = String(over.id);
 
-    let targetStage: LeadPipelineStage | null = null;
-    if (LEAD_STAGE_KEYS.includes(overId as LeadPipelineStage)) {
-      targetStage = overId as LeadPipelineStage;
-    } else {
+    // Résoudre la colonne cible : soit overId est un id de colonne,
+    // soit c'est un lead — on prend alors la colonne du lead survolé.
+    let targetCol: LeadBoardColumn | null = columnById.get(overId) ?? null;
+    if (!targetCol) {
       const overLead = findLead(overId);
-      if (overLead) targetStage = overLead.pipeline_stage;
+      if (overLead) {
+        const colId = getLeadBoardColumnId(
+          overLead.pipeline_stage,
+          overLead.assigned_to,
+          columns
+        );
+        if (colId) targetCol = columnById.get(colId) ?? null;
+      }
     }
 
     const draggedLead = findLead(leadId);
-    if (
-      !targetStage ||
-      !draggedLead ||
-      draggedLead.pipeline_stage === targetStage
-    ) {
+    if (!targetCol || !draggedLead) {
       snapshotRef.current = null;
       return;
     }
 
-    const finalStage = targetStage;
+    // Aucun changement effectif ? (même stage + même assignation)
+    const sameStage = draggedLead.pipeline_stage === targetCol.stage;
+    const sameAssignee =
+      targetCol.assignedTo === null
+        ? true
+        : draggedLead.assigned_to === targetCol.assignedTo;
+    if (sameStage && sameAssignee) {
+      snapshotRef.current = null;
+      return;
+    }
+
+    const finalStage = targetCol.stage;
+    const finalAssignedTo = targetCol.assignedTo;
+
     onLeadsChange((prev) =>
       prev.map((l) =>
-        l.id === leadId ? { ...l, pipeline_stage: finalStage } : l
+        l.id === leadId
+          ? {
+              ...l,
+              pipeline_stage: finalStage,
+              // On ne touche assigned_to que si la colonne cible le précise
+              assigned_to:
+                finalAssignedTo !== null ? finalAssignedTo : l.assigned_to,
+            }
+          : l
       )
     );
 
-    const result = await updateLeadStage(leadId, finalStage);
+    const result =
+      finalAssignedTo !== null
+        ? await updateLeadStageAndAssignee(leadId, finalStage, finalAssignedTo)
+        : await updateLeadStage(leadId, finalStage);
+
     if (!result.success && snapshotRef.current) {
       const snap = snapshotRef.current;
       onLeadsChange(() => snap);
@@ -133,27 +185,27 @@ export function LeadsKanban({
     );
   }
 
-  // Mode mobile : liste verticale groupée par stage, pas de dnd
+  // Mode mobile : liste verticale groupée par colonne, pas de dnd
   if (isMobile) {
     return (
       <div className="space-y-4">
-        {LEAD_STAGES.map((stage) => {
-          const items = leadsByStage[stage.key];
+        {columns.map((col) => {
+          const items = leadsByColumn[col.id] ?? [];
           return (
-            <section key={stage.key} className="space-y-2">
+            <section key={col.id} className="space-y-2">
               <header
                 className="px-3 py-2 bg-[#111927] border border-[var(--border)] flex items-center justify-between"
-                style={{ borderTop: `2px solid ${stage.accent}` }}
+                style={{ borderTop: `2px solid ${col.accent}` }}
               >
                 <div className="min-w-0">
                   <h3
                     className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
-                    style={{ color: stage.accent }}
+                    style={{ color: col.accent }}
                   >
-                    {stage.label}
+                    {col.label}
                   </h3>
                   <p className="text-[10px] text-muted-foreground/70 truncate">
-                    {stage.description}
+                    {col.description}
                   </p>
                 </div>
                 <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 ml-2">
@@ -195,15 +247,15 @@ export function LeadsKanban({
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-3 min-w-max items-start">
-        {LEAD_STAGES.map((stage) => {
-          const items = leadsByStage[stage.key];
+        {columns.map((col) => {
+          const items = leadsByColumn[col.id] ?? [];
           return (
             <Column
-              key={stage.key}
-              stageKey={stage.key}
-              accent={stage.accent}
-              label={stage.label}
-              description={stage.description}
+              key={col.id}
+              columnId={col.id}
+              accent={col.accent}
+              label={col.label}
+              description={col.description}
               count={items.length}
             >
               <SortableContext
@@ -240,7 +292,7 @@ export function LeadsKanban({
 }
 
 interface ColumnProps {
-  stageKey: LeadPipelineStage;
+  columnId: string;
   label: string;
   description: string;
   accent: string;
@@ -249,7 +301,7 @@ interface ColumnProps {
 }
 
 function Column({
-  stageKey,
+  columnId,
   label,
   description,
   accent,
@@ -257,8 +309,8 @@ function Column({
   children,
 }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
-    id: stageKey,
-    data: { type: "column", stage: stageKey },
+    id: columnId,
+    data: { type: "column", columnId },
   });
 
   return (
