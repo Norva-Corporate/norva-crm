@@ -29,7 +29,8 @@ export type LeadPipelineStage =
   | "verified"
   | "to_contact"
   | "contacted"
-  | "in_discussion";
+  | "in_discussion"
+  | "stand_by";
 
 export type LeadEmailVerified = "valid" | "risky" | "invalid" | "unverified";
 
@@ -449,6 +450,7 @@ const VALID_PIPELINE_STAGES: LeadPipelineStage[] = [
   "to_contact",
   "contacted",
   "in_discussion",
+  "stand_by",
 ];
 
 /**
@@ -499,6 +501,12 @@ const STAGE_TASK_TEMPLATES: Partial<
     description: "Le prospect a répondu — prépare l'offre.",
     priority: "high",
     due_in: 3,
+  },
+  stand_by: {
+    title: (name) => `Recontacter ${name}`,
+    description: "Lead parké — relance prévue après ~1 mois de pause.",
+    priority: "normal",
+    due_in: 30,
   },
 };
 

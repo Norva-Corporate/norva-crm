@@ -39,6 +39,12 @@ export const LEAD_STAGES: LeadStageDef[] = [
     accent: "#22C55E",
     description: "Le prospect a répondu",
   },
+  {
+    key: "stand_by",
+    label: "Stand By",
+    accent: "#94A3B8",
+    description: "À rappeler dans 1+ mois",
+  },
 ];
 
 export function getLeadStage(key: LeadPipelineStage): LeadStageDef {
