@@ -96,8 +96,13 @@ export async function listLeads(): Promise<LeadWithDedup[]> {
     .select(
       "*, assignee:profiles!lead_imports_assigned_to_fkey(id, email, full_name, avatar_url)"
     )
-    .order("imported_at", { ascending: false })
-    .limit(200);
+    // Tri par `stage_updated_at` DESC : les leads activement travaillés
+    // remontent en premier (un lead bougé dans le kanban aujourd'hui passe
+    // devant un lead importé plus tard mais jamais touché). Fallback sur
+    // `imported_at` pour les leads dont le stage n'a jamais bougé. Pas de
+    // limite : on charge tout (kanban + vue liste s'appuient là-dessus).
+    .order("stage_updated_at", { ascending: false, nullsFirst: false })
+    .order("imported_at", { ascending: false });
   if (!leads) return [];
 
   const emails = leads
