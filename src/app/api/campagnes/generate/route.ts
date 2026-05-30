@@ -29,11 +29,17 @@ async function fetchGoogleMapsInfo(url: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  // Accepte soit le secret interne, soit l'appel Vercel Cron
-  const secret = req.headers.get("x-internal-secret");
-  const vercelCron = req.headers.get("authorization");
-  const isVercelCron = vercelCron === `Bearer ${process.env.CRON_SECRET}`;
-  const isInternalCall = secret === process.env.INTERNAL_SECRET;
+  // Accepte soit le secret interne, soit l'appel Vercel Cron.
+  // Guard: si l'env var attendue est absente, on N'ACCEPTE PAS ce canal —
+  // sinon la comparaison deviendrait "Bearer undefined" / "undefined" et un
+  // attaquant pourrait l'envoyer en clair pour bypass l'auth.
+  const internalSecret = process.env.INTERNAL_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
+  const headerSecret = req.headers.get("x-internal-secret");
+  const headerAuth = req.headers.get("authorization");
+
+  const isInternalCall = !!internalSecret && headerSecret === internalSecret;
+  const isVercelCron = !!cronSecret && headerAuth === `Bearer ${cronSecret}`;
 
   if (!isVercelCron && !isInternalCall) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
