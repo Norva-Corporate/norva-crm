@@ -23,6 +23,7 @@ import {
   Plug,
   MessagesSquare,
   Settings2,
+  Mail,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -43,6 +44,7 @@ const navItems: NavItem[] = [
   { label: "Calendrier", href: "/dashboard/calendrier", icon: CalendarDays },
   { label: "Discussion", href: "/dashboard/discussion", icon: MessagesSquare, badgeKey: "discussion" },
   { label: "Leads", href: "/dashboard/leads", icon: Sparkles },
+  { label: "Campagnes", href: "/dashboard/campagnes", icon: Mail },
   { label: "Contacts", href: "/dashboard/contacts", icon: Users },
   { label: "Entreprises", href: "/dashboard/companies", icon: Building2 },
   { label: "Pipeline", href: "/dashboard/pipeline", icon: Kanban },
