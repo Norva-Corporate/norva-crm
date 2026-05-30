@@ -29,9 +29,13 @@ async function fetchGoogleMapsInfo(url: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  // Verify internal secret to protect the endpoint
+  // Accepte soit le secret interne, soit l'appel Vercel Cron
   const secret = req.headers.get("x-internal-secret");
-  if (secret !== process.env.INTERNAL_SECRET) {
+  const vercelCron = req.headers.get("authorization");
+  const isVercelCron = vercelCron === `Bearer ${process.env.CRON_SECRET}`;
+  const isInternalCall = secret === process.env.INTERNAL_SECRET;
+
+  if (!isVercelCron && !isInternalCall) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
