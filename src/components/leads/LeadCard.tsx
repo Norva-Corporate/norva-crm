@@ -55,7 +55,7 @@ interface LeadCardProps {
 // Les stages où on propose des actions agent / conversion
 const ACTION_STAGES: LeadWithDedup["pipeline_stage"][] = [
   "to_contact",
-  "email_sent",
+  "to_email",
   "contacted",
   "in_discussion",
 ];

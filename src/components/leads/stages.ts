@@ -28,10 +28,10 @@ export const LEAD_STAGES: LeadStageDef[] = [
     description: "Priorisé pour cette semaine",
   },
   {
-    key: "email_sent",
-    label: "Email envoyé",
+    key: "to_email",
+    label: "À mailer",
     accent: "#6366F1",
-    description: "Cold email envoyé — en attente de réponse",
+    description: "Cold email à envoyer cette semaine",
   },
   {
     key: "contacted",

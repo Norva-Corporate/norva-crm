@@ -28,7 +28,7 @@ export type LeadPipelineStage =
   | "brut"
   | "verified"
   | "to_contact"
-  | "email_sent"
+  | "to_email"
   | "contacted"
   | "in_discussion"
   | "stand_by";
@@ -449,7 +449,7 @@ const VALID_PIPELINE_STAGES: LeadPipelineStage[] = [
   "brut",
   "verified",
   "to_contact",
-  "email_sent",
+  "to_email",
   "contacted",
   "in_discussion",
   "stand_by",
@@ -492,11 +492,11 @@ const STAGE_TASK_TEMPLATES: Partial<
     priority: "high",
     due_in: 1,
   },
-  email_sent: {
-    title: (name) => `Relancer ${name} (email)`,
-    description: "Cold email envoyé — relance prévue si pas de réponse.",
-    priority: "normal",
-    due_in: 4,
+  to_email: {
+    title: (name) => `Envoyer un email à ${name}`,
+    description: "Cold email à envoyer — utilise le kit ✉️ si dispo.",
+    priority: "high",
+    due_in: 2,
   },
   contacted: {
     title: (name) => `Relancer ${name}`,
