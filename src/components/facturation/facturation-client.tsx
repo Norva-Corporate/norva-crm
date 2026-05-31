@@ -28,18 +28,10 @@ import {
   cn,
   getEffectiveInvoiceStatus,
 } from "@/lib/utils";
+import { invoiceStatuses } from "@/lib/statuses";
 import type { Invoice, InvoiceStatus, DocumentType } from "@/types";
 
-const STATUS_CONFIG: Record<
-  InvoiceStatus,
-  { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }
-> = {
-  brouillon: { label: "Brouillon", variant: "secondary" },
-  envoyee: { label: "Envoyée", variant: "default" },
-  payee: { label: "Payée", variant: "success" },
-  en_retard: { label: "En retard", variant: "destructive" },
-  annulee: { label: "Annulée", variant: "secondary" },
-};
+const STATUS_CONFIG = invoiceStatuses;
 
 const STATUS_FILTERS: { key: "all" | InvoiceStatus; label: string }[] = [
   { key: "all", label: "Toutes" },

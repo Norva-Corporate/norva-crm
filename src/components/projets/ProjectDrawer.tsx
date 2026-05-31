@@ -27,16 +27,17 @@ import {
   type ProjectInput,
 } from "@/lib/actions/projects";
 import { DriveFolderButton } from "@/components/integrations/drive-folder-button";
+import { projectStatuses } from "@/lib/statuses";
 import type { Project, ProjectStatus } from "@/types";
 
 const NO_VALUE = "__none__";
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
-  en_attente: "En attente",
-  en_cours: "En cours",
-  en_pause: "En pause",
-  termine: "Terminé",
-  annule: "Annulé",
+  en_attente: projectStatuses.en_attente.label,
+  en_cours: projectStatuses.en_cours.label,
+  en_pause: projectStatuses.en_pause.label,
+  termine: projectStatuses.termine.label,
+  annule: projectStatuses.annule.label,
 };
 
 interface ProjectDrawerProps {

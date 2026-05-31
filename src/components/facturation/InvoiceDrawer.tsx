@@ -28,16 +28,17 @@ import {
   type InvoiceInput,
   type InvoiceItemInput,
 } from "@/lib/actions/invoices";
+import { invoiceStatuses } from "@/lib/statuses";
 import type { DocumentType, Invoice, InvoiceStatus } from "@/types";
 
 const NO_VALUE = "__none__";
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  brouillon: "Brouillon",
-  envoyee: "Envoyée",
-  payee: "Payée",
-  en_retard: "En retard",
-  annulee: "Annulée",
+  brouillon: invoiceStatuses.brouillon.label,
+  envoyee: invoiceStatuses.envoyee.label,
+  payee: invoiceStatuses.payee.label,
+  en_retard: invoiceStatuses.en_retard.label,
+  annulee: invoiceStatuses.annulee.label,
 };
 
 interface InvoiceDrawerProps {

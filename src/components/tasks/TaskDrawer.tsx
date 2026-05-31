@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { createTask, updateTask, type TaskInput } from "@/lib/actions/tasks";
+import { taskStatuses, taskPriorities } from "@/lib/statuses";
 import type {
   Task,
   TaskPriority,
@@ -32,17 +33,17 @@ import type {
 const NO_VALUE = "__none__";
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  pending: "À faire",
-  in_progress: "En cours",
-  done: "Terminée",
-  cancelled: "Annulée",
+  pending: taskStatuses.pending.label,
+  in_progress: taskStatuses.in_progress.label,
+  done: taskStatuses.done.label,
+  cancelled: taskStatuses.cancelled.label,
 };
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  low: "Basse",
-  normal: "Normale",
-  high: "Haute",
-  urgent: "Urgente",
+  low: taskPriorities.low.label,
+  normal: taskPriorities.normal.label,
+  high: taskPriorities.high.label,
+  urgent: taskPriorities.urgent.label,
 };
 
 interface TaskDrawerProps {

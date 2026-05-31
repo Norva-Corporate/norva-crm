@@ -29,34 +29,27 @@ import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteTask, updateTaskStatus } from "@/lib/actions/tasks";
 import { getProjectColor } from "@/lib/project-color";
 import { formatDate, cn } from "@/lib/utils";
-import type { Task, TaskPriority, TaskStatus } from "@/types";
+import { taskStatuses, taskPriorities } from "@/lib/statuses";
+import type { Task, TaskStatus } from "@/types";
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  pending: "À faire",
-  in_progress: "En cours",
-  done: "Terminée",
-  cancelled: "Annulée",
+  pending: taskStatuses.pending.label,
+  in_progress: taskStatuses.in_progress.label,
+  done: taskStatuses.done.label,
+  cancelled: taskStatuses.cancelled.label,
 };
 
 const STATUS_VARIANT: Record<
   TaskStatus,
   React.ComponentProps<typeof Badge>["variant"]
 > = {
-  pending: "secondary",
-  in_progress: "default",
-  done: "success",
-  cancelled: "outline",
+  pending: taskStatuses.pending.variant,
+  in_progress: taskStatuses.in_progress.variant,
+  done: taskStatuses.done.variant,
+  cancelled: taskStatuses.cancelled.variant,
 };
 
-const PRIORITY_META: Record<
-  TaskPriority,
-  { label: string; color: string }
-> = {
-  low: { label: "Basse", color: "text-muted-foreground" },
-  normal: { label: "Normale", color: "text-foreground" },
-  high: { label: "Haute", color: "text-[#FB923C]" },
-  urgent: { label: "Urgente", color: "text-destructive" },
-};
+const PRIORITY_META = taskPriorities;
 
 const FILTER_OPTIONS: { key: "all" | "mine" | "overdue" | "this_week"; label: string }[] = [
   { key: "all", label: "Toutes" },

@@ -22,26 +22,14 @@ import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteProject } from "@/lib/actions/projects";
 import { formatDate, cn } from "@/lib/utils";
+import { projectStatuses, projectStatusList } from "@/lib/statuses";
 import type { Project, ProjectStatus } from "@/types";
 
-const STATUS_CONFIG: Record<
-  ProjectStatus,
-  { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive"; progress: number; color: string }
-> = {
-  en_attente: { label: "En attente", variant: "secondary", progress: 0, color: "#8A99B8" },
-  en_cours: { label: "En cours", variant: "default", progress: 50, color: "#3B7BF5" },
-  en_pause: { label: "En pause", variant: "warning", progress: 50, color: "#F59E0B" },
-  termine: { label: "Terminé", variant: "success", progress: 100, color: "#22C55E" },
-  annule: { label: "Annulé", variant: "destructive", progress: 0, color: "#EF4444" },
-};
+const STATUS_CONFIG = projectStatuses;
 
 const FILTERS: { key: "all" | ProjectStatus; label: string }[] = [
   { key: "all", label: "Tous" },
-  { key: "en_attente", label: "En attente" },
-  { key: "en_cours", label: "En cours" },
-  { key: "en_pause", label: "En pause" },
-  { key: "termine", label: "Terminé" },
-  { key: "annule", label: "Annulé" },
+  ...projectStatusList.map((s) => ({ key: s.key, label: s.label })),
 ];
 
 type ProjectRow = Project & {

@@ -50,27 +50,16 @@ import type {
   TaskStatus,
 } from "@/types";
 
-const STATUS_CONFIG: Record<
-  ProjectStatus,
-  {
-    label: string;
-    variant: "default" | "secondary" | "success" | "warning" | "destructive";
-    color: string;
-  }
-> = {
-  en_attente: { label: "En attente", variant: "secondary", color: "#8A99B8" },
-  en_cours: { label: "En cours", variant: "default", color: "#3B7BF5" },
-  en_pause: { label: "En pause", variant: "warning", color: "#F59E0B" },
-  termine: { label: "Terminé", variant: "success", color: "#22C55E" },
-  annule: { label: "Annulé", variant: "destructive", color: "#EF4444" },
-};
+import { projectStatuses, invoiceStatuses } from "@/lib/statuses";
+
+const STATUS_CONFIG = projectStatuses;
 
 const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
-  brouillon: "Brouillon",
-  envoyee: "Envoyée",
-  payee: "Payée",
-  en_retard: "En retard",
-  annulee: "Annulée",
+  brouillon: invoiceStatuses.brouillon.label,
+  envoyee: invoiceStatuses.envoyee.label,
+  payee: invoiceStatuses.payee.label,
+  en_retard: invoiceStatuses.en_retard.label,
+  annulee: invoiceStatuses.annulee.label,
 };
 
 interface InvoiceLite {
