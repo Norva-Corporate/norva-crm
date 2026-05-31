@@ -344,3 +344,49 @@ export async function getCompanyWithContactsAndDeals(id: string) {
     deals: deals ?? [],
   };
 }
+
+// ============================================================
+// LIST helpers — Phase D3 (uniformisation data-fetching)
+// ============================================================
+export async function listContactsWithCompany() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("contacts")
+    .select("*, company:companies(id, name)")
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
+
+export interface CompanyWithCount {
+  id: string;
+  name: string;
+  domain: string | null;
+  sector: string | null;
+  size: string | null;
+  website: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  contacts_count: number;
+}
+
+export async function listCompaniesWithContactCount(): Promise<
+  CompanyWithCount[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("companies")
+    .select("*, contacts(count)")
+    .order("name");
+
+  type Row = Omit<CompanyWithCount, "contacts_count"> & {
+    contacts: { count: number }[] | null;
+  };
+  return ((data ?? []) as Row[]).map((c) => {
+    const { contacts, ...rest } = c;
+    return { ...rest, contacts_count: contacts?.[0]?.count ?? 0 };
+  });
+}

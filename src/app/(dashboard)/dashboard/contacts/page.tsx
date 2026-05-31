@@ -1,25 +1,20 @@
 import React from "react";
-import { createClient } from "@/lib/supabase/server";
+import { listContactsWithCompany } from "@/lib/actions/contacts";
+import { listCompaniesForPicker } from "@/lib/actions/pickers";
 import { ContactsClient } from "@/components/contacts/contacts-client";
 
 export default async function ContactsPage() {
-  const supabase = await createClient();
-
-  const { data: contacts } = await supabase
-    .from("contacts")
-    .select("*, company:companies(id, name)")
-    .order("created_at", { ascending: false });
-
-  const { data: companies } = await supabase
-    .from("companies")
-    .select("id, name")
-    .order("name");
+  const [contacts, companies] = await Promise.all([
+    listContactsWithCompany(),
+    listCompaniesForPicker(),
+  ]);
 
   return (
     <div className="flex flex-col flex-1">
       <ContactsClient
-        initialContacts={contacts ?? []}
-        companies={companies ?? []}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        initialContacts={contacts as any}
+        companies={companies}
       />
     </div>
   );

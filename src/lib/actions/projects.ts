@@ -344,3 +344,17 @@ export async function getProjectWithDetails(id: string) {
 
   return { ...project, invoices: invoices ?? [] };
 }
+
+// ============================================================
+// LIST — Phase D3
+// ============================================================
+export async function listProjectsWithRelations() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("projects")
+    .select(
+      "*, deal:deals(id, title, contact:contacts(id, first_name, last_name), company:companies(id, name)), contact:contacts!projects_contact_id_fkey(id, first_name, last_name), company:companies!projects_company_id_fkey(id, name), assignee:profiles!projects_assigned_to_fkey(id, full_name)"
+    )
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
