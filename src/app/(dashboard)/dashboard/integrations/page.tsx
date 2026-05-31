@@ -20,10 +20,13 @@ export const metadata = {
 interface IntegrationRow {
   google_account_email: string | null;
   google_calendar_id: string | null;
+  scope: string | null;
   last_sync_at: string | null;
   last_sync_error: string | null;
   connected_at: string;
 }
+
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
@@ -47,7 +50,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
   const { data: integration } = await supabase
     .from("user_integrations")
     .select(
-      "google_account_email, google_calendar_id, last_sync_at, last_sync_error, connected_at"
+      "google_account_email, google_calendar_id, scope, last_sync_at, last_sync_error, connected_at"
     )
     .eq("user_id", user.id)
     .eq("provider", "google_calendar")
@@ -56,6 +59,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
   const row = integration as IntegrationRow | null;
   const isConnected = !!row;
   const needsReauth = row?.last_sync_error === "reauth_required";
+  const hasDriveScope = (row?.scope ?? "").includes(DRIVE_SCOPE);
 
   const params = await searchParams;
   const flashStatus = params.status;
@@ -93,12 +97,15 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
                 <CalendarDays className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle>Google Calendar</CardTitle>
+                <CardTitle>Google Calendar + Drive</CardTitle>
                 <CardDescription>
-                  Publie automatiquement les échéances de deals, tâches, projets
-                  et factures dans un calendrier dédié <em>Norva CRM</em>.
-                  Apparaît aussi dans Notion Calendar via le compte Google
-                  associé.
+                  <strong>Calendar</strong> — Publie les échéances de deals,
+                  tâches, projets et factures dans un calendrier dédié{" "}
+                  <em>Norva CRM</em>.
+                  <br />
+                  <strong>Drive</strong> — Crée à la demande un dossier
+                  structuré (Brief / Devis / Contrat) par deal ou projet, depuis
+                  son drawer.
                 </CardDescription>
               </div>
             </div>
@@ -162,6 +169,20 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
                     {row.last_sync_error === "reauth_required"
                       ? "Le token Google a été révoqué. Reconnectez votre compte pour reprendre la synchronisation."
                       : row.last_sync_error}
+                  </p>
+                </div>
+              )}
+
+              {!hasDriveScope && !needsReauth && (
+                <div className="border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+                  <div className="flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4" />
+                    Drive non autorisé
+                  </div>
+                  <p className="mt-1 text-xs">
+                    Votre connexion couvre Calendar mais pas Drive. Reconnectez
+                    votre compte Google pour activer la création de dossiers
+                    Drive depuis les drawers Deal / Projet.
                   </p>
                 </div>
               )}

@@ -26,6 +26,7 @@ import {
   updateProject,
   type ProjectInput,
 } from "@/lib/actions/projects";
+import { DriveFolderButton } from "@/components/integrations/drive-folder-button";
 import type { Project, ProjectStatus } from "@/types";
 
 const NO_VALUE = "__none__";
@@ -379,6 +380,17 @@ export function ProjectDrawer({
                   />
                 </div>
               </div>
+
+              {isEdit && project?.id && (
+                <div className="space-y-1.5">
+                  <Label>Documents</Label>
+                  <DriveFolderButton
+                    kind="project"
+                    id={project.id}
+                    initialUrl={project.drive_folder_url ?? null}
+                  />
+                </div>
+              )}
 
               {error && (
                 <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 px-2.5 py-1.5 rounded-sm">

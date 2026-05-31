@@ -34,6 +34,7 @@ import {
 import { getTagsForEntity } from "@/lib/actions/tags";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { AgentButton } from "@/components/agents/agent-button";
+import { DriveFolderButton } from "@/components/integrations/drive-folder-button";
 import { Target } from "lucide-react";
 import type {
   DealStage,
@@ -342,6 +343,18 @@ export function DealDrawer({
                       successMessage="Re-scoring en file. Lance l'agent dans multica."
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Google Drive (édition uniquement) */}
+              {isEdit && deal?.id && (
+                <div className="space-y-1.5">
+                  <Label>Documents</Label>
+                  <DriveFolderButton
+                    kind="deal"
+                    id={deal.id}
+                    initialUrl={deal.drive_folder_url ?? null}
+                  />
                 </div>
               )}
 

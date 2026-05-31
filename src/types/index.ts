@@ -63,6 +63,10 @@ export interface Deal {
   notes: string | null;
   /** Lead d'origine si le deal a été créé via convertLeadToDeal (022) */
   source_lead_id: string | null;
+  /** ID Drive du dossier auto-créé pour ce deal (039) */
+  drive_folder_id: string | null;
+  /** URL webViewLink Google Drive cache (039) */
+  drive_folder_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -100,6 +104,10 @@ export interface Project {
   duration_days: number;
   assigned_to: string | null;
   assignee?: Profile;
+  /** ID Drive du dossier auto-créé pour ce projet (039) */
+  drive_folder_id: string | null;
+  /** URL webViewLink Google Drive cache (039) */
+  drive_folder_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -164,6 +172,8 @@ export interface DealWithRelations {
   notes: string | null;
   source_lead_id: string | null;
   source_lead: DealSourceLead | null;
+  drive_folder_id: string | null;
+  drive_folder_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
