@@ -3,14 +3,18 @@ import React, { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { Button } from "@/components/ui/button";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
-import { KanbanBoard } from "./KanbanBoard";
+import { PipelineKanban } from "./PipelineKanban";
 import { ListView } from "./ListView";
 import { DealDrawer } from "./DealDrawer";
+import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { OPEN_STAGES } from "./stages";
 import { cn, formatCurrency } from "@/lib/utils";
 import { deleteDeal } from "@/lib/actions/deals";
+import type {
+  LeadAssignee,
+  LeadWithDedup,
+} from "@/lib/actions/leads";
 import type { DealStage, DealWithRelations } from "@/types";
 
 type ViewMode = "kanban" | "list";
@@ -29,21 +33,27 @@ interface ProfileOption {
 
 interface PipelineClientProps {
   initialDeals: DealWithRelations[];
+  initialLeads: LeadWithDedup[];
   contacts: ContactOption[];
   companies: { id: string; name: string }[];
   profiles: ProfileOption[];
+  leadProfiles: LeadAssignee[];
 }
 
 export function PipelineClient({
   initialDeals,
+  initialLeads,
   contacts,
   companies,
   profiles,
+  leadProfiles,
 }: PipelineClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [deals, setDeals] = useState<DealWithRelations[]>(initialDeals);
+  const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
   const [view, setView] = useState<ViewMode>("kanban");
+  const [openLead, setOpenLead] = useState<LeadWithDedup | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<DealWithRelations | null>(
@@ -181,11 +191,17 @@ export function PipelineClient({
         <div className="flex-1 min-h-0">
           {view === "kanban" ? (
             <div className="h-full md:overflow-x-auto px-4 md:px-6 pb-6">
-              <KanbanBoard
+              <PipelineKanban
+                leads={leads}
                 deals={deals}
+                profiles={leadProfiles}
+                onLeadsChange={(updater) =>
+                  setLeads((prev) => updater(prev))
+                }
                 onDealsChange={(updater) => setDeals((prev) => updater(prev))}
+                onOpenLead={(lead) => setOpenLead(lead)}
                 onOpenDeal={openEdit}
-                onCreateInStage={openCreateInStage}
+                onCreateDealInStage={openCreateInStage}
               />
             </div>
           ) : (
@@ -211,6 +227,17 @@ export function PipelineClient({
         onSaved={handleSaved}
         onDeleted={handleDeletedFromDrawer}
         onStageChanged={handleStageChangedFromDrawer}
+      />
+
+      <LeadDrawer
+        lead={openLead}
+        companies={companies}
+        profiles={leadProfiles}
+        onOpenChange={(o) => !o && setOpenLead(null)}
+        onSuccess={() => {
+          setOpenLead(null);
+          startTransition(() => router.refresh());
+        }}
       />
 
       <DeleteModal

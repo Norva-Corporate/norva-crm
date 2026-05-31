@@ -285,7 +285,7 @@ export async function convertLead(
     })
     .eq("id", leadId);
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/contacts");
   if (companyId) revalidatePath("/dashboard/companies");
 
@@ -317,7 +317,7 @@ export async function markLeadAsDuplicate(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -338,7 +338,7 @@ export async function dismissLead(leadId: string): Promise<ActionResult> {
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -353,7 +353,7 @@ export async function reopenLead(leadId: string): Promise<ActionResult> {
     })
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -441,7 +441,7 @@ export async function updateLead(
       error: error?.message ?? "Mise à jour impossible.",
     };
   }
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: data as LeadImport };
 }
 
@@ -629,7 +629,7 @@ export async function updateLeadStage(
     await createStageTask(supabase, lead, stage, user.id);
   }
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/taches");
   return { success: true, data: null };
 }
@@ -693,7 +693,7 @@ export async function updateLeadStageAndAssignee(
     );
   }
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/taches");
   return { success: true, data: null };
 }
@@ -746,7 +746,7 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
     await createStageTask(supabase, lead, "to_contact", user.id);
   }
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/taches");
   return { success: true, data: null };
 }
@@ -766,6 +766,7 @@ export async function convertLeadToDeal(
   overrides?: {
     deal_title?: string;
     deal_value?: number | null;
+    deal_stage?: import("@/types").DealStage;
     company_id?: string | null;
     company_name?: string;
     company_domain?: string;
@@ -814,7 +815,7 @@ export async function convertLeadToDeal(
     .from("deals")
     .insert({
       title: dealTitle,
-      stage: "discussion",
+      stage: overrides?.deal_stage ?? "discussion",
       contact_id,
       company_id,
       value: dealValue,
@@ -832,7 +833,7 @@ export async function convertLeadToDeal(
     };
   }
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/contacts");
 

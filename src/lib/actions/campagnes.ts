@@ -93,7 +93,7 @@ export async function validateAndSendCampaign(
       .eq("id", campaign.lead_id);
 
     revalidatePath("/dashboard/campagnes");
-    revalidatePath("/dashboard/leads");
+    revalidatePath("/dashboard/pipeline");
     return { success: true, data: null };
   } catch (err) {
     return { success: false, error: String(err) };

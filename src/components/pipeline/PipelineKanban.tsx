@@ -1,0 +1,494 @@
+"use client";
+import React, { useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  DragOverlay,
+  useDroppable,
+  type DragStartEvent,
+  type DragEndEvent,
+  type DragCancelEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { Plus, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
+import { DealCard } from "./DealCard";
+import { LeadCard } from "@/components/leads/LeadCard";
+import {
+  buildUnifiedColumns,
+  getDealColumnId,
+  getLeadColumnId,
+  isConversionBoundary,
+  type UnifiedColumn,
+} from "./unified-stages";
+import { cn, formatCurrency } from "@/lib/utils";
+import { updateDealStage } from "@/lib/actions/deals";
+import {
+  convertLeadToDeal,
+  updateLeadStage,
+  updateLeadStageAndAssignee,
+  type LeadAssignee,
+  type LeadWithDedup,
+} from "@/lib/actions/leads";
+import { useIsMobile } from "@/hooks/use-media-query";
+import type { DealStage, DealWithRelations } from "@/types";
+
+interface PipelineKanbanProps {
+  leads: LeadWithDedup[];
+  deals: DealWithRelations[];
+  profiles: LeadAssignee[];
+  onLeadsChange: (
+    updater: (prev: LeadWithDedup[]) => LeadWithDedup[]
+  ) => void;
+  onDealsChange: (
+    updater: (prev: DealWithRelations[]) => DealWithRelations[]
+  ) => void;
+  onOpenLead: (lead: LeadWithDedup) => void;
+  onOpenDeal: (deal: DealWithRelations) => void;
+  onCreateDealInStage: (stage: DealStage) => void;
+}
+
+type ActiveItem =
+  | { kind: "lead"; lead: LeadWithDedup }
+  | { kind: "deal"; deal: DealWithRelations };
+
+export function PipelineKanban({
+  leads,
+  deals,
+  profiles,
+  onLeadsChange,
+  onDealsChange,
+  onOpenLead,
+  onOpenDeal,
+  onCreateDealInStage,
+}: PipelineKanbanProps) {
+  const isMobile = useIsMobile();
+  const [active, setActive] = useState<ActiveItem | null>(null);
+  const leadsSnapshot = useRef<LeadWithDedup[] | null>(null);
+  const dealsSnapshot = useRef<DealWithRelations[] | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    })
+  );
+
+  const columns = useMemo(() => buildUnifiedColumns(profiles), [profiles]);
+
+  const columnById = useMemo(() => {
+    const m = new Map<string, UnifiedColumn>();
+    for (const c of columns) m.set(c.id, c);
+    return m;
+  }, [columns]);
+
+  /** Bucket : leads + deals dispatchés dans leurs colonnes. */
+  const itemsByColumn = useMemo(() => {
+    const acc: Record<string, ActiveItem[]> = {};
+    for (const c of columns) acc[c.id] = [];
+
+    const firstToContactColId =
+      columns.find((c) => c.kind === "lead" && c.stage === "to_contact")?.id ??
+      null;
+
+    for (const l of leads) {
+      const colId = getLeadColumnId(l.pipeline_stage, l.assigned_to, columns);
+      if (colId && acc[colId]) {
+        acc[colId].push({ kind: "lead", lead: l });
+      } else if (l.pipeline_stage === "to_contact" && firstToContactColId) {
+        acc[firstToContactColId].push({ kind: "lead", lead: l });
+      }
+    }
+    for (const d of deals) {
+      const colId = getDealColumnId(d.stage);
+      if (acc[colId]) acc[colId].push({ kind: "deal", deal: d });
+    }
+    return acc;
+  }, [columns, leads, deals]);
+
+  function findLead(id: string) {
+    return leads.find((l) => l.id === id);
+  }
+  function findDeal(id: string) {
+    return deals.find((d) => d.id === id);
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    const id = String(event.active.id);
+    const lead = findLead(id);
+    if (lead) {
+      setActive({ kind: "lead", lead });
+      leadsSnapshot.current = leads;
+      return;
+    }
+    const deal = findDeal(id);
+    if (deal) {
+      setActive({ kind: "deal", deal });
+      dealsSnapshot.current = deals;
+    }
+  }
+
+  function handleDragCancel(_event: DragCancelEvent) {
+    setActive(null);
+    leadsSnapshot.current = null;
+    dealsSnapshot.current = null;
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active: dragged, over } = event;
+    setActive(null);
+
+    if (!over) {
+      leadsSnapshot.current = null;
+      dealsSnapshot.current = null;
+      return;
+    }
+
+    const draggedId = String(dragged.id);
+    const overId = String(over.id);
+
+    // Résoudre la colonne cible : overId est soit un id de colonne,
+    // soit un id d'item (carte survolée) → on remonte à sa colonne.
+    let targetCol: UnifiedColumn | null = columnById.get(overId) ?? null;
+    if (!targetCol) {
+      const overLead = findLead(overId);
+      if (overLead) {
+        const colId = getLeadColumnId(
+          overLead.pipeline_stage,
+          overLead.assigned_to,
+          columns
+        );
+        if (colId) targetCol = columnById.get(colId) ?? null;
+      } else {
+        const overDeal = findDeal(overId);
+        if (overDeal) {
+          targetCol = columnById.get(getDealColumnId(overDeal.stage)) ?? null;
+        }
+      }
+    }
+    if (!targetCol) {
+      leadsSnapshot.current = null;
+      dealsSnapshot.current = null;
+      return;
+    }
+
+    const draggedLead = findLead(draggedId);
+    if (draggedLead) {
+      await handleLeadDrop(draggedLead, targetCol);
+      return;
+    }
+    const draggedDeal = findDeal(draggedId);
+    if (draggedDeal) {
+      await handleDealDrop(draggedDeal, targetCol);
+    }
+  }
+
+  async function handleLeadDrop(lead: LeadWithDedup, target: UnifiedColumn) {
+    if (target.kind === "lead") {
+      // Lead → colonne lead : pareil que LeadsKanban (stage + éventuelle assignation)
+      const sameStage = lead.pipeline_stage === target.stage;
+      const sameAssignee =
+        target.assignedTo === null
+          ? true
+          : lead.assigned_to === target.assignedTo;
+      if (sameStage && sameAssignee) {
+        leadsSnapshot.current = null;
+        return;
+      }
+
+      const finalStage = target.stage;
+      const finalAssignee = target.assignedTo;
+
+      onLeadsChange((prev) =>
+        prev.map((l) =>
+          l.id === lead.id
+            ? {
+                ...l,
+                pipeline_stage: finalStage,
+                assigned_to:
+                  finalAssignee !== null ? finalAssignee : l.assigned_to,
+              }
+            : l
+        )
+      );
+
+      const result =
+        finalAssignee !== null
+          ? await updateLeadStageAndAssignee(lead.id, finalStage, finalAssignee)
+          : await updateLeadStage(lead.id, finalStage);
+
+      if (!result.success && leadsSnapshot.current) {
+        const snap = leadsSnapshot.current;
+        onLeadsChange(() => snap);
+      }
+      leadsSnapshot.current = null;
+      return;
+    }
+
+    // Lead → colonne deal : conversion automatique
+    const targetStage = target.stage;
+    // Optimistic : retire le lead du board pendant la conversion
+    onLeadsChange((prev) => prev.filter((l) => l.id !== lead.id));
+
+    const result = await convertLeadToDeal(lead.id, { deal_stage: targetStage });
+    if (!result.success) {
+      toast.error(result.error ?? "Conversion impossible.");
+      if (leadsSnapshot.current) {
+        const snap = leadsSnapshot.current;
+        onLeadsChange(() => snap);
+      }
+      leadsSnapshot.current = null;
+      return;
+    }
+
+    toast.success(`Lead converti → deal ${targetStage}.`);
+    // Le router.refresh() de la page parente recharge leads + deals
+    // (la page sera revalidée par convertLeadToDeal).
+    leadsSnapshot.current = null;
+    dealsSnapshot.current = null;
+  }
+
+  async function handleDealDrop(deal: DealWithRelations, target: UnifiedColumn) {
+    if (target.kind === "lead") {
+      // Deal → colonne lead : refusé
+      toast.error("Un deal ne peut pas être renvoyé en prospection.");
+      dealsSnapshot.current = null;
+      return;
+    }
+    if (deal.stage === target.stage) {
+      dealsSnapshot.current = null;
+      return;
+    }
+
+    const finalStage = target.stage;
+    onDealsChange((prev) =>
+      prev.map((d) => (d.id === deal.id ? { ...d, stage: finalStage } : d))
+    );
+
+    const result = await updateDealStage(deal.id, finalStage);
+    if (!result.success && dealsSnapshot.current) {
+      const snap = dealsSnapshot.current;
+      onDealsChange(() => snap);
+    }
+    dealsSnapshot.current = null;
+  }
+
+  // Mode mobile : liste verticale groupée par colonne, pas de dnd
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {columns.map((col) => {
+          const items = itemsByColumn[col.id] ?? [];
+          return (
+            <section key={col.id} className="space-y-2">
+              <header
+                className="px-3 py-2 bg-[#111927] border border-[var(--border)] flex items-center justify-between"
+                style={{ borderTop: `2px solid ${col.accent}` }}
+              >
+                <h3
+                  className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
+                  style={{ color: col.accent }}
+                >
+                  {col.label}
+                </h3>
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {items.length}
+                </span>
+              </header>
+              {items.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground/50 text-center py-3 italic">
+                  Vide
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {items.map((it) =>
+                    it.kind === "lead" ? (
+                      <LeadCard
+                        key={it.lead.id}
+                        lead={it.lead}
+                        onOpen={onOpenLead}
+                        mobile
+                      />
+                    ) : (
+                      <DealCard
+                        key={it.deal.id}
+                        deal={it.deal}
+                        onOpen={onOpenDeal}
+                        mobile
+                      />
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragCancel={handleDragCancel}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex gap-3 min-w-max items-start">
+        {columns.map((col, idx) => {
+          const items = itemsByColumn[col.id] ?? [];
+          const prev = idx > 0 ? columns[idx - 1] : null;
+          const showSeparator = prev ? isConversionBoundary(prev, col) : false;
+
+          const stageTotal =
+            col.kind === "deal"
+              ? items.reduce(
+                  (sum, it) =>
+                    it.kind === "deal" ? sum + (it.deal.value ?? 0) : sum,
+                  0
+                )
+              : 0;
+
+          return (
+            <React.Fragment key={col.id}>
+              {showSeparator && <ConversionSeparator />}
+              <Column
+                columnId={col.id}
+                col={col}
+                count={items.length}
+                dealTotal={col.kind === "deal" ? stageTotal : null}
+                onAddDeal={
+                  col.kind === "deal"
+                    ? () => onCreateDealInStage(col.stage)
+                    : null
+                }
+              >
+                <SortableContext
+                  items={items.map((it) =>
+                    it.kind === "lead" ? it.lead.id : it.deal.id
+                  )}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {items.map((it) =>
+                      it.kind === "lead" ? (
+                        <LeadCard
+                          key={it.lead.id}
+                          lead={it.lead}
+                          onOpen={onOpenLead}
+                        />
+                      ) : (
+                        <DealCard
+                          key={it.deal.id}
+                          deal={it.deal}
+                          onOpen={onOpenDeal}
+                        />
+                      )
+                    )}
+                  </div>
+                </SortableContext>
+              </Column>
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      <DragOverlay dropAnimation={null}>
+        {active?.kind === "lead" ? (
+          <LeadCard lead={active.lead} onOpen={() => {}} overlay />
+        ) : active?.kind === "deal" ? (
+          <DealCard deal={active.deal} onOpen={() => {}} overlay />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
+interface ColumnProps {
+  columnId: string;
+  col: UnifiedColumn;
+  count: number;
+  dealTotal: number | null;
+  onAddDeal: (() => void) | null;
+  children: React.ReactNode;
+}
+
+function Column({
+  columnId,
+  col,
+  count,
+  dealTotal,
+  onAddDeal,
+  children,
+}: ColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnId,
+    data: { type: "column", kind: col.kind },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "w-72 shrink-0 flex flex-col bg-[#111927] border border-[var(--border)] transition-colors",
+        "max-h-[calc(100vh-12rem)]",
+        isOver && "border-accent/40 bg-[#111927]/90"
+      )}
+    >
+      <div
+        className="px-3 py-2.5 border-b border-[var(--border)] flex items-center justify-between gap-2"
+        style={{ borderTop: `2px solid ${col.accent}` }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <h3
+            className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
+            style={{ color: col.accent }}
+          >
+            {col.label}
+          </h3>
+          <span className="text-[10px] text-muted-foreground tabular-nums">
+            {count}
+          </span>
+        </div>
+        {dealTotal !== null && (
+          <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+            {dealTotal > 0 ? formatCurrency(dealTotal) : "—"}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+        {children}
+        {onAddDeal && (
+          <button
+            type="button"
+            onClick={onAddDeal}
+            className="w-full py-2 text-[11px] text-muted-foreground hover:text-accent border border-dashed border-[var(--border)] hover:border-accent/40 transition-colors inline-flex items-center justify-center gap-1"
+          >
+            <Plus className="h-3 w-3" />
+            Ajouter un deal
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Séparateur visuel entre la dernière colonne lead et la première deal. */
+function ConversionSeparator() {
+  return (
+    <div className="shrink-0 flex flex-col items-center justify-start pt-12 px-1">
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">
+        Conversion
+      </div>
+      <ArrowRight className="h-4 w-4 text-accent" />
+      <div className="mt-2 h-[60vh] w-px bg-[var(--border)]" />
+    </div>
+  );
+}
