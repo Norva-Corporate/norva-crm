@@ -5,7 +5,6 @@ import { getContactWithDeals } from "@/lib/actions/contacts";
 import { getActivitiesForEntity } from "@/lib/actions/activities";
 import { getTagsForEntity } from "@/lib/actions/tags";
 import { getTasksForEntity } from "@/lib/actions/agent-tasks";
-import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { ContactDetailClient } from "@/components/contacts/ContactDetailClient";
 
 interface PageProps {
@@ -19,14 +18,14 @@ export default async function ContactDetailPage({ params }: PageProps) {
   if (!contact) notFound();
 
   const supabase = await createClient();
-  const [{ data: companies }, activities, tags, agentTasks, customFields] =
-    await Promise.all([
+  const [{ data: companies }, activities, tags, agentTasks] = await Promise.all(
+    [
       supabase.from("companies").select("id, name").order("name"),
       getActivitiesForEntity("contact", id),
       getTagsForEntity("contact", id),
       getTasksForEntity("contact", id),
-      getFieldsWithValues("contact", id),
-    ]);
+    ]
+  );
 
   return (
     <div className="flex flex-col flex-1">
@@ -38,7 +37,6 @@ export default async function ContactDetailPage({ params }: PageProps) {
         activities={activities as any}
         tags={tags}
         agentTasks={agentTasks}
-        customFields={customFields}
       />
     </div>
   );

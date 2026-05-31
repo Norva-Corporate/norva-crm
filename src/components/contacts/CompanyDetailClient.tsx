@@ -25,14 +25,12 @@ import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { CompanyDrawer } from "@/components/contacts/CompanyDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { EntityTags } from "@/components/tags/entity-tags";
-import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { deleteCompany, patchCompany, type CompanyPatch } from "@/lib/actions/contacts";
 import { InlineText } from "@/components/ui/inline-text";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
 import type {
   Company,
   Contact,
-  CustomFieldWithValue,
   DealStage,
   Tag,
 } from "@/types";
@@ -52,7 +50,6 @@ interface Props {
   contacts: Contact[];
   deals: DealRow[];
   tags?: Tag[];
-  customFields?: CustomFieldWithValue[];
 }
 
 const stageLabels: Record<DealStage, string> = {
@@ -68,7 +65,6 @@ export function CompanyDetailClient({
   contacts,
   deals,
   tags = [],
-  customFields = [],
 }: Props) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
@@ -416,12 +412,6 @@ export function CompanyDetailClient({
             </ul>
           )}
         </Card>
-
-        <CustomFieldsPanel
-          entityType="company"
-          entityId={company.id}
-          initialFields={customFields}
-        />
       </div>
 
       <CompanyDrawer

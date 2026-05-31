@@ -5,7 +5,6 @@ import { getProjectWithDetails } from "@/lib/actions/projects";
 import { getTasksForProject } from "@/lib/actions/tasks";
 import { getActivitiesForEntity } from "@/lib/actions/activities";
 import { getTagsForEntity } from "@/lib/actions/tags";
-import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { ProjectDetailClient } from "@/components/projets/ProjectDetailClient";
 
 export default async function ProjectDetailPage({
@@ -27,7 +26,6 @@ export default async function ProjectDetailPage({
     { data: companies },
     activities,
     tags,
-    customFields,
     projectTasks,
   ] = await Promise.all([
     supabase
@@ -44,7 +42,6 @@ export default async function ProjectDetailPage({
     supabase.from("companies").select("id, name").order("name"),
     getActivitiesForEntity("project", id),
     getTagsForEntity("project", id),
-    getFieldsWithValues("project", id),
     getTasksForProject(id),
   ]);
 
@@ -60,7 +57,6 @@ export default async function ProjectDetailPage({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       activities={activities as any}
       tags={tags}
-      customFields={customFields}
       tasks={projectTasks}
     />
   );

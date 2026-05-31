@@ -1,6 +1,7 @@
 import "server-only";
 
 import { MailerSend, EmailParams, Sender, Recipient } from "mailersend";
+import { escapeHtml } from "@/lib/html";
 import {
   groupReponsesBySections,
   labelForOption,
@@ -12,15 +13,6 @@ interface BriefNotificationPayload {
   prospect_email: string | null;
   prospect_entreprise: string | null;
   reponses: Record<string, unknown>;
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 function previewValue(value: unknown, fieldKey?: string): string {

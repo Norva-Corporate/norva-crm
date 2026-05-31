@@ -230,7 +230,6 @@ export type ActivityEntityType =
   | "deal"
   | "project"
   | "invoice"
-  | "contrat"
   | "lead_import";
 
 export type ActivityType =
@@ -240,11 +239,6 @@ export type ActivityType =
   | "invoice_status_changed"
   | "project_created"
   | "project_status_changed"
-  | "contract_generated"
-  | "contract_sent"
-  | "contract_signed"
-  | "contract_refused"
-  | "contract_expired"
   | "note"
   | "call"
   | "meeting"
@@ -268,7 +262,6 @@ export type NotificationType =
   | "task_assigned"
   | "deal_assigned"
   | "invoice_paid"
-  | "discussion_mention"
   | string;
 
 export interface Notification {
@@ -346,160 +339,4 @@ export interface AgentTask {
   error: string | null;
 }
 
-// ============================================================
-// Discussion (messagerie interne)
-// ============================================================
-export type MentionType =
-  | "user"
-  | "company"
-  | "contact"
-  | "project"
-  | "task"
-  | "invoice";
 
-export interface Mention {
-  type: MentionType;
-  id: string;
-  label: string;
-}
-
-export interface Attachment {
-  path: string;
-  name: string;
-  size: number;
-  mime: string;
-}
-
-export interface DiscussionChannel {
-  id: string;
-  name: string;
-  description: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DiscussionMessage {
-  id: string;
-  channel_id: string;
-  user_id: string | null;
-  content: string;
-  parent_id: string | null;
-  attachments: Attachment[];
-  mentions: Mention[];
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-  author?: Pick<Profile, "id" | "full_name" | "avatar_url" | "email"> | null;
-}
-
-export interface DiscussionRead {
-  user_id: string;
-  channel_id: string;
-  last_read_at: string;
-}
-
-export interface ChannelWithUnread extends DiscussionChannel {
-  unread_count: number;
-  last_read_at: string | null;
-}
-
-// ============================================================
-// Custom Fields
-// ============================================================
-
-export type CustomFieldType =
-  | "text"
-  | "number"
-  | "date"
-  | "select"
-  | "url"
-  | "boolean";
-
-export type CustomFieldEntityType =
-  | "contact"
-  | "company"
-  | "deal"
-  | "project"
-  | "lead_import";
-
-export interface CustomFieldDefinition {
-  id: string;
-  entity_type: CustomFieldEntityType;
-  name: string;
-  field_type: CustomFieldType;
-  options: string[] | null;
-  required: boolean;
-  sort_order: number;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CustomFieldValue {
-  id: string;
-  field_id: string;
-  entity_type: CustomFieldEntityType;
-  entity_id: string;
-  value: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** Définition enrichie avec la valeur courante pour une entité donnée. */
-export interface CustomFieldWithValue extends CustomFieldDefinition {
-  value: string | null;
-  value_id: string | null;
-}
-
-// ============================================================
-// Contrats (signature électronique Yousign)
-// ============================================================
-
-export type ContratStatut =
-  | "brouillon"
-  | "genere"
-  | "envoye"
-  | "signe"
-  | "refuse"
-  | "expire";
-
-export interface ContratClientSnapshot {
-  raison_sociale: string;
-  siret: string;
-  email: string;
-  phone?: string | null;
-  representant?: string | null;
-  adresse?: string | null;
-}
-
-export interface ContratOptions {
-  site: boolean;
-  maintenance: boolean;
-  seo_ads: boolean;
-  social: boolean;
-}
-
-export interface Contrat {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  deal_id: string | null;
-  contact_id: string | null;
-  ref: string;
-  client_snapshot: ContratClientSnapshot;
-  options: ContratOptions;
-  montant_total: number;
-  acompte: number;
-  solde: number;
-  statut: ContratStatut;
-  docuseal_submission_id: string | null;
-  docuseal_submitter_id: string | null;
-  pdf_path: string | null;
-  signed_pdf_path: string | null;
-  proof_path: string | null;
-  sent_at: string | null;
-  signed_at: string | null;
-  expires_at: string | null;
-  created_by: string;
-}

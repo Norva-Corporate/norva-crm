@@ -25,7 +25,6 @@ import { InlineText } from "@/components/ui/inline-text";
 import { InlinePicker } from "@/components/ui/inline-picker";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
-import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import Link from "next/link";
 import {
   Loader2,
@@ -55,7 +54,7 @@ import {
   type LeadUpdatePatch,
   type LeadWithDedup,
 } from "@/lib/actions/leads";
-import type { Activity, CustomFieldWithValue, Tag } from "@/types";
+import type { Activity, Tag } from "@/types";
 import { cn } from "@/lib/utils";
 
 const NEW_COMPANY = "__new__";
@@ -101,9 +100,6 @@ export function LeadDrawer({
   const [error, setError] = useState<string | null>(null);
 
   const [activities, setActivities] = useState<Activity[] | null>(null);
-  const [customFields, setCustomFields] = useState<
-    CustomFieldWithValue[] | null
-  >(null);
   const [tags, setTags] = useState<Tag[] | null>(null);
   const [associatedDeal, setAssociatedDeal] = useState<{
     id: string;
@@ -129,14 +125,12 @@ export function LeadDrawer({
       setCompanyDomain("");
     }
     setActivities(null);
-    setCustomFields(null);
     setTags(null);
     setAssociatedDeal(null);
     let cancelled = false;
     getLeadDetails(lead.id).then((d) => {
       if (cancelled) return;
       setActivities(d.activities as unknown as Activity[]);
-      setCustomFields(d.customFields);
       setTags(d.tags);
       setAssociatedDeal(d.associatedDeal);
     });
@@ -510,15 +504,6 @@ export function LeadDrawer({
               )}
             </Section>
 
-            {customFields === null ? (
-              <SectionSkeleton />
-            ) : (
-              <CustomFieldsPanel
-                entityType="lead_import"
-                entityId={leadId}
-                initialFields={customFields}
-              />
-            )}
 
             {activities === null ? (
               <SectionSkeleton />

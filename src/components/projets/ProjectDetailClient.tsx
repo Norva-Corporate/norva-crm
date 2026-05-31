@@ -31,7 +31,6 @@ import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { InlineText } from "@/components/ui/inline-text";
 import { InlinePicker } from "@/components/ui/inline-picker";
-import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { patchProject, type ProjectPatch } from "@/lib/actions/projects";
 import {
   updateTaskStatus,
@@ -41,7 +40,6 @@ import { getProjectColor } from "@/lib/project-color";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type {
   Activity,
-  CustomFieldWithValue,
   Project,
   ProjectStatus,
   InvoiceStatus,
@@ -120,7 +118,6 @@ interface Props {
     } | null;
   })[];
   tags?: Tag[];
-  customFields?: CustomFieldWithValue[];
   tasks?: ProjectTaskRow[];
 }
 
@@ -133,7 +130,6 @@ export function ProjectDetailClient({
   companies,
   activities = [],
   tags = [],
-  customFields = [],
   tasks = [],
 }: Props) {
   const router = useRouter();
@@ -681,12 +677,6 @@ export function ProjectDetailClient({
             </>
           )}
         </Card>
-
-        <CustomFieldsPanel
-          entityType="project"
-          entityId={project.id}
-          initialFields={customFields}
-        />
 
         {/* Activity timeline */}
         <ActivityTimeline

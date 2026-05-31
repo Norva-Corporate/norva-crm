@@ -32,14 +32,10 @@ import {
   type DealInput,
 } from "@/lib/actions/deals";
 import { getTagsForEntity } from "@/lib/actions/tags";
-import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { EntityTags } from "@/components/tags/entity-tags";
-import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { AgentButton } from "@/components/agents/agent-button";
-import { ContratsSection } from "@/components/contrats/ContratsSection";
 import { Target } from "lucide-react";
 import type {
-  CustomFieldWithValue,
   DealStage,
   DealWithRelations,
   Tag,
@@ -118,23 +114,17 @@ export function DealDrawer({
   const [deletePending, startDeleteTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [dealTags, setDealTags] = useState<Tag[]>([]);
-  const [customFields, setCustomFields] = useState<CustomFieldWithValue[]>([]);
 
   // Load tags when drawer opens for an existing deal
   useEffect(() => {
     if (!open || !deal?.id) {
       setDealTags([]);
-      setCustomFields([]);
       return;
     }
     let cancelled = false;
-    Promise.all([
-      getTagsForEntity("deal", deal.id),
-      getFieldsWithValues("deal", deal.id),
-    ]).then(([tags, fields]) => {
+    getTagsForEntity("deal", deal.id).then((tags) => {
       if (cancelled) return;
       setDealTags(tags);
-      setCustomFields(fields);
     });
     return () => {
       cancelled = true;
@@ -549,16 +539,6 @@ export function DealDrawer({
                 </div>
               )}
 
-              {isEdit && deal?.id && (
-                <div className="pt-2 border-t border-[var(--border)] -mx-1">
-                  <CustomFieldsPanel
-                    entityType="deal"
-                    entityId={deal.id}
-                    initialFields={customFields}
-                  />
-                </div>
-              )}
-
               {error && (
                 <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 px-2.5 py-1.5">
                   {error}
@@ -597,12 +577,6 @@ export function DealDrawer({
                 </div>
               )}
 
-              {/* Contrats (édition uniquement) */}
-              {isEdit && deal?.id && (
-                <div className="pt-2 border-t border-[var(--border)]">
-                  <ContratsSection scope={{ type: "deal", id: deal.id }} />
-                </div>
-              )}
 
               {/* Suppression (édition uniquement) */}
               {isEdit && (

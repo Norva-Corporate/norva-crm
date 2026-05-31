@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   getActivitiesForEntity,
 } from "@/lib/actions/activities";
-import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { getTagsForEntity } from "@/lib/actions/tags";
 
 export type ActionResult<T = null> =
@@ -867,13 +866,12 @@ export async function getLeadAssociatedDeal(
  * et le deal associé si le lead a été converti.
  */
 export async function getLeadDetails(leadId: string) {
-  const [activities, customFields, tags, associatedDeal] = await Promise.all([
+  const [activities, tags, associatedDeal] = await Promise.all([
     getActivitiesForEntity("lead_import", leadId),
-    getFieldsWithValues("lead_import", leadId),
     getTagsForEntity("lead_import", leadId),
     getLeadAssociatedDeal(leadId),
   ]);
-  return { activities, customFields, tags, associatedDeal };
+  return { activities, tags, associatedDeal };
 }
 
 /**
