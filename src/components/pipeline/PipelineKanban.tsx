@@ -46,6 +46,15 @@ interface PipelineKanbanProps {
   /** Si false : la colonne 'Brut' et ses leads sont retirés du rendu
    *  (réduit drastiquement le DOM quand le volume de leads bruts est gros). */
   showBrut: boolean;
+  /** Filtre texte appliqué sur le nom du lead/contact et le nom d'entreprise.
+   *  Vide = aucune filtre. */
+  searchQuery: string;
+  /** Si non-null : filtre les leads dont assigned_to ne matche pas ce
+   *  profile.id. Les deals ne sont pas filtrés par owner ici (les deals
+   *  ont leur propre assigné — feature future si besoin). */
+  ownerProfileId: string | null;
+  /** Si true : ne montre que les leads avec quality_score >= 80. */
+  topQualityOnly: boolean;
   onLeadsChange: (
     updater: (prev: LeadWithDedup[]) => LeadWithDedup[]
   ) => void;
@@ -66,6 +75,9 @@ export function PipelineKanban({
   deals,
   profiles,
   showBrut,
+  searchQuery,
+  ownerProfileId,
+  topQualityOnly,
   onLeadsChange,
   onDealsChange,
   onOpenLead,
@@ -98,14 +110,48 @@ export function PipelineKanban({
     [allColumns, showBrut]
   );
 
-  // Leads filtrés selon showBrut.
-  const visibleLeads = useMemo(
-    () =>
-      showBrut
-        ? leads
-        : leads.filter((l) => l.pipeline_stage !== "brut"),
-    [leads, showBrut]
-  );
+  // Leads filtrés selon showBrut + searchQuery + ownerProfileId + topQualityOnly.
+  const visibleLeads = useMemo(() => {
+    let base = showBrut
+      ? leads
+      : leads.filter((l) => l.pipeline_stage !== "brut");
+
+    if (ownerProfileId) {
+      base = base.filter((l) => l.assigned_to === ownerProfileId);
+    }
+    if (topQualityOnly) {
+      base = base.filter(
+        (l) => l.quality_score != null && l.quality_score >= 80
+      );
+    }
+
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((l) => {
+      const name = `${l.first_name ?? ""} ${l.last_name ?? ""}`
+        .toLowerCase()
+        .trim();
+      const company = (l.company_name ?? "").toLowerCase();
+      const email = (l.email ?? "").toLowerCase();
+      return name.includes(q) || company.includes(q) || email.includes(q);
+    });
+  }, [leads, showBrut, searchQuery, ownerProfileId, topQualityOnly]);
+
+  // Deals filtrés selon searchQuery (title + contact + company).
+  const visibleDeals = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return deals;
+    return deals.filter((d) => {
+      const title = d.title.toLowerCase();
+      const contact = d.contact
+        ? `${d.contact.first_name} ${d.contact.last_name}`.toLowerCase()
+        : "";
+      const company = d.company?.name?.toLowerCase() ?? "";
+      return (
+        title.includes(q) || contact.includes(q) || company.includes(q)
+      );
+    });
+  }, [deals, searchQuery]);
 
   const columnById = useMemo(() => {
     const m = new Map<string, UnifiedColumn>();
@@ -130,12 +176,12 @@ export function PipelineKanban({
         acc[firstToContactColId].push({ kind: "lead", lead: l });
       }
     }
-    for (const d of deals) {
+    for (const d of visibleDeals) {
       const colId = getDealColumnId(d.stage);
       if (acc[colId]) acc[colId].push({ kind: "deal", deal: d });
     }
     return acc;
-  }, [columns, visibleLeads, deals]);
+  }, [columns, visibleLeads, visibleDeals]);
 
   /** Suppression optimiste d'un lead dismiss / mise à jour du status si qualified. */
   const handleLeadChanged = useCallback(

@@ -7,7 +7,8 @@ import React, {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, LayoutGrid, List } from "lucide-react";
+import { Eye, EyeOff, LayoutGrid, List, Search, Star } from "lucide-react";
+import { TO_CONTACT_OWNERS } from "@/lib/team";
 import { Header } from "@/components/layout/header";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { PipelineKanban } from "./PipelineKanban";
@@ -60,6 +61,29 @@ export function PipelineClient({
   const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
   const [view, setView] = useState<ViewMode>("kanban");
   const [openLead, setOpenLead] = useState<LeadWithDedup | null>(null);
+
+  // Recherche libre dans le kanban — filtre par nom/entreprise sur leads
+  // ET deals. État local, pas persisté (volontaire : la recherche est
+  // contextuelle à la session). Min 1 char pour activer le filtre.
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filtre par owner (Kylian / Lohan / null=tous). Filtre quality top
+  // (true = uniquement les leads avec quality_score >= 80). États
+  // contextuels session, non persistés.
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+  const [topQualityOnly, setTopQualityOnly] = useState(false);
+  // Map email → profile.id pour le filtre owner (les leadProfiles ont
+  // l'email + l'id, on s'en sert pour matcher lead.assigned_to).
+  const ownerEmailToProfileId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of leadProfiles) {
+      if (p.email) m.set(p.email.toLowerCase(), p.id);
+    }
+    return m;
+  }, [leadProfiles]);
+  const selectedOwnerProfileId = ownerFilter
+    ? ownerEmailToProfileId.get(ownerFilter.toLowerCase()) ?? null
+    : null;
 
   // Re-sync les states locaux quand le server component re-fetch après
   // un router.refresh() (par exemple suite à un dismiss / convert ou un
@@ -259,6 +283,80 @@ export function PipelineClient({
             </div>
           </div>
 
+          {/* Recherche + filtres — uniquement en vue kanban. */}
+          {view === "kanban" && (
+            <>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher…"
+                  className={cn(
+                    "h-7 pl-7 pr-2 text-xs border border-[var(--border)] bg-[var(--surface)]",
+                    "placeholder:text-muted-foreground",
+                    "focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent",
+                    "w-48"
+                  )}
+                />
+              </div>
+
+              {/* Filtre owner (chip toggles : Tous / Kylian / Lohan) */}
+              <div className="inline-flex border border-[var(--border)] bg-[var(--surface)] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setOwnerFilter(null)}
+                  className={cn(
+                    "h-6 px-2 text-[11px] transition-colors",
+                    ownerFilter === null
+                      ? "bg-accent/15 text-accent"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Tous
+                </button>
+                {TO_CONTACT_OWNERS.map((owner) => (
+                  <button
+                    key={owner.email}
+                    type="button"
+                    onClick={() => setOwnerFilter(owner.email)}
+                    className={cn(
+                      "h-6 px-2 text-[11px] transition-colors inline-flex items-center gap-1"
+                    )}
+                    style={
+                      ownerFilter === owner.email
+                        ? { color: owner.accent, background: `${owner.accent}20` }
+                        : undefined
+                    }
+                  >
+                    <span
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ background: owner.accent }}
+                    />
+                    {owner.shortName}
+                  </button>
+                ))}
+              </div>
+
+              {/* Filtre quality top */}
+              <button
+                type="button"
+                onClick={() => setTopQualityOnly((v) => !v)}
+                className={cn(
+                  "inline-flex items-center gap-1 h-7 px-2.5 text-xs border transition-colors",
+                  topQualityOnly
+                    ? "border-[#F59E0B]/40 text-[#F59E0B] bg-[#F59E0B]/10"
+                    : "border-[var(--border)] text-muted-foreground hover:text-foreground"
+                )}
+                title="Filtrer sur les leads avec quality_score ≥ 80"
+              >
+                <Star className="h-3.5 w-3.5" />
+                Top qualité
+              </button>
+            </>
+          )}
+
           {/* Toggle Bruts — uniquement en vue kanban, masque les leads
               en stage 'brut' pour alléger drastiquement le DOM. */}
           {view === "kanban" && brutHydrated && brutCount > 0 && (
@@ -313,6 +411,9 @@ export function PipelineClient({
                 deals={deals}
                 profiles={leadProfiles}
                 showBrut={showBrut}
+                searchQuery={searchQuery}
+                ownerProfileId={selectedOwnerProfileId}
+                topQualityOnly={topQualityOnly}
                 onLeadsChange={handleLeadsChange}
                 onDealsChange={handleDealsChange}
                 onOpenLead={handleOpenLead}

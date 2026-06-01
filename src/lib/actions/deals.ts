@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
@@ -185,6 +186,21 @@ export async function updateDealStage(
   void syncEntityToAllConnectedUsers("deal", id).catch((e) =>
     console.error("[gcal sync] updateDealStage:", e)
   );
+
+  // Auto-création du dossier Drive quand le deal entre en phase
+  // commerciale (passage à `discussion`). Idempotent : si le dossier
+  // existe déjà, ensureDealDriveFolder court-circuite. Déféré via
+  // after() pour ne pas bloquer le drag.
+  if (stage === "discussion") {
+    after(async () => {
+      const { ensureDealDriveFolder } = await import("@/lib/actions/deals");
+      const res = await ensureDealDriveFolder(id);
+      if (!res.success) {
+        console.error("[drive auto] updateDealStage:", res.error);
+      }
+    });
+  }
+
   revalidateDeals();
   return { success: true, data: null };
 }
