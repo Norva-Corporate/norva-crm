@@ -6,6 +6,7 @@ import {
   getActivitiesForEntity,
 } from "@/lib/actions/activities";
 import { getTagsForEntity } from "@/lib/actions/tags";
+import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 
 export type ActionResult<T = null> =
   | { success: true; data: T }
@@ -441,6 +442,21 @@ export async function updateLead(
       error: error?.message ?? "Mise à jour impossible.",
     };
   }
+
+  // Si la date de relance a été modifiée, recréer / annuler la tâche
+  // auto en conséquence (et sync GCal). Couvre le cas où l'utilisateur
+  // pose une date depuis le drawer sur un lead déjà placé en
+  // contacted/stand_by — sans cela, aucune tâche ne serait créée tant
+  // qu'il ne re-drag pas le lead.
+  if ("next_follow_up_at" in cleaned) {
+    await ensureLeadFollowUpTask(
+      supabase,
+      data as LeadImport & { pipeline_stage: LeadPipelineStage },
+      user.id
+    );
+    revalidatePath("/dashboard/taches");
+  }
+
   revalidatePath("/dashboard/pipeline");
   return { success: true, data: data as LeadImport };
 }
@@ -506,13 +522,25 @@ const STAGE_TASK_TEMPLATES: Partial<
 };
 
 /**
- * Crée la tâche de relance liée à un nouveau stage si les conditions
- * sont réunies (template existe + next_follow_up_at posé). Annule la
- * précédente tâche auto pending pour ce lead (dédup propre).
- * Non bloquant : si la création échoue, le drag du lead aboutit quand
- * même (log côté serveur).
+ * Crée / met à jour la tâche de relance liée à un lead, avec dédup
+ * propre via `tasks.auto_origin`. Triggers :
+ *   1. Changement de stage du lead (drag dans le kanban) — appelé
+ *      par updateLeadStage / updateLeadStageAndAssignee.
+ *   2. Modification de `next_follow_up_at` depuis le drawer —
+ *      appelé par updateLead.
+ *
+ * Comportement :
+ *   - Si pas de template pour le stage actuel OU pas de date posée
+ *     → annule la tâche auto précédente (si elle existait), pas de
+ *     nouvelle tâche créée.
+ *   - Sinon → annule l'ancienne, crée la nouvelle avec
+ *     `due_date = next_follow_up_at`, et synchronise vers Google
+ *     Calendar (best-effort).
+ *
+ * Non bloquant : si la création/sync échoue, l'opération principale
+ * (update du lead) aboutit quand même (log serveur).
  */
-async function createStageTask(
+async function ensureLeadFollowUpTask(
   supabase: Awaited<ReturnType<typeof createClient>>,
   lead: {
     id: string;
@@ -521,22 +549,32 @@ async function createStageTask(
     company_name: string | null;
     assigned_to: string | null;
     next_follow_up_at: string | null;
+    pipeline_stage: LeadPipelineStage;
   },
-  stage: LeadPipelineStage,
   userId: string
 ): Promise<void> {
-  const template = STAGE_TASK_TEMPLATES[stage];
-  if (!template) return; // stages hors scope (brut / verified / to_contact / to_email / in_discussion)
-  if (!lead.next_follow_up_at) return; // pas de date de relance → on ne crée rien
+  const template = STAGE_TASK_TEMPLATES[lead.pipeline_stage];
+  const shouldHaveTask = !!template && !!lead.next_follow_up_at;
 
   // 1) Annule les tâches auto pending précédentes pour ce lead
-  await supabase
+  //    (toujours fait, même si on ne va pas en créer de nouvelle).
+  const { data: cancelled } = await supabase
     .from("tasks")
     .update({ status: "cancelled" })
     .eq("related_type", "lead_import")
     .eq("related_id", lead.id)
     .like("auto_origin", "lead_stage:%")
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
+
+  // Sync les tâches annulées vers GCal (retire l'event)
+  for (const t of cancelled ?? []) {
+    void syncEntityToAllConnectedUsers("task", t.id).catch((e) =>
+      console.error("[ensureLeadFollowUpTask] sync cancel:", e)
+    );
+  }
+
+  if (!shouldHaveTask) return; // pas de date posée ou stage hors scope
 
   // 2) Crée la nouvelle tâche avec la date posée par l'utilisateur
   const fullName =
@@ -544,22 +582,32 @@ async function createStageTask(
     lead.company_name ||
     "ce prospect";
 
-  const { error } = await supabase.from("tasks").insert({
-    title: template.title(fullName),
-    description: template.description,
-    status: "pending",
-    priority: template.priority,
-    due_date: lead.next_follow_up_at.slice(0, 10), // timestamptz → YYYY-MM-DD
-    related_type: "lead_import",
-    related_id: lead.id,
-    assigned_to: lead.assigned_to ?? userId,
-    auto_origin: `lead_stage:${stage}`,
-    created_by: userId,
-  });
+  const { data: inserted, error } = await supabase
+    .from("tasks")
+    .insert({
+      title: template.title(fullName),
+      description: template.description,
+      status: "pending",
+      priority: template.priority,
+      due_date: lead.next_follow_up_at!.slice(0, 10), // timestamptz → YYYY-MM-DD
+      related_type: "lead_import",
+      related_id: lead.id,
+      assigned_to: lead.assigned_to ?? userId,
+      auto_origin: `lead_stage:${lead.pipeline_stage}`,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("[createStageTask] failed:", error.message);
+  if (error || !inserted) {
+    console.error("[ensureLeadFollowUpTask] insert:", error?.message);
+    return;
   }
+
+  // 3) Push vers Google Calendar (best-effort, async)
+  void syncEntityToAllConnectedUsers("task", inserted.id).catch((e) =>
+    console.error("[ensureLeadFollowUpTask] sync insert:", e)
+  );
 }
 
 /**
@@ -607,7 +655,11 @@ export async function updateLeadStage(
   // Crée la tâche de relance liée au nouveau stage si conditions réunies
   // (stage contacted/stand_by + next_follow_up_at posé).
   if (lead.pipeline_stage !== stage) {
-    await createStageTask(supabase, lead, stage, user.id);
+    await ensureLeadFollowUpTask(
+      supabase,
+      { ...lead, pipeline_stage: stage },
+      user.id
+    );
   }
 
   revalidatePath("/dashboard/pipeline");
@@ -667,10 +719,9 @@ export async function updateLeadStageAndAssignee(
   // Crée la tâche de relance liée au nouveau stage (avec le nouvel assignee)
   // si conditions réunies (stage contacted/stand_by + next_follow_up_at posé).
   if (lead.pipeline_stage !== stage) {
-    await createStageTask(
+    await ensureLeadFollowUpTask(
       supabase,
-      { ...lead, assigned_to: assignedTo },
-      stage,
+      { ...lead, assigned_to: assignedTo, pipeline_stage: stage },
       user.id
     );
   }
