@@ -475,62 +475,40 @@ function stageToStatus(stage: LeadPipelineStage): "pending" | "qualified" {
 // Tâches auto liées au stage (020)
 // ============================================================
 //
-// Quand un lead change de stage, on crée auto une tâche pour ne rien
-// oublier. Avant de créer, on annule la tâche pending précédente
-// auto-créée pour ce lead (dédup via `tasks.auto_origin`).
+// Quand un lead change de stage, on crée une tâche de relance auto
+// UNIQUEMENT si :
+//   - le stage est `contacted` ou `stand_by` (vraies relances ; `to_contact` /
+//     `to_email` / `in_discussion` = premier contact ou prépa deal, hors scope),
+//   - ET le lead a une date de relance posée dans `next_follow_up_at`.
+// La due_date de la tâche est exactement `next_follow_up_at` (champ rempli
+// manuellement depuis le LeadDrawer). Aucune date posée → aucune tâche créée.
+// La dédup via `tasks.auto_origin` reste active.
 
 type StageTaskTemplate = {
   title: (fullName: string) => string;
   description: string;
   priority: "normal" | "high" | "urgent";
-  /** Days from now */
-  due_in: number;
 };
 
 const STAGE_TASK_TEMPLATES: Partial<
   Record<LeadPipelineStage, StageTaskTemplate>
 > = {
-  to_contact: {
-    title: (name) => `Appeler ${name}`,
-    description: "Premier contact — utilise le kit ✉️ généré si dispo.",
-    priority: "high",
-    due_in: 1,
-  },
-  to_email: {
-    title: (name) => `Envoyer un email à ${name}`,
-    description: "Cold email à envoyer — utilise le kit ✉️ si dispo.",
-    priority: "high",
-    due_in: 2,
-  },
   contacted: {
     title: (name) => `Relancer ${name}`,
     description: "Vérifier la réponse au cold outreach.",
     priority: "normal",
-    due_in: 5,
-  },
-  in_discussion: {
-    title: (name) => `Préparer proposition pour ${name}`,
-    description: "Le prospect a répondu — prépare l'offre.",
-    priority: "high",
-    due_in: 3,
   },
   stand_by: {
     title: (name) => `Recontacter ${name}`,
-    description: "Lead parké — relance prévue après ~1 mois de pause.",
+    description: "Lead parké — relance prévue.",
     priority: "normal",
-    due_in: 30,
   },
 };
 
-function addDays(date: Date, days: number): string {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
 /**
- * Crée la tâche auto liée à un nouveau stage. Annule la précédente
- * tâche auto pending pour ce lead (dédup propre).
+ * Crée la tâche de relance liée à un nouveau stage si les conditions
+ * sont réunies (template existe + next_follow_up_at posé). Annule la
+ * précédente tâche auto pending pour ce lead (dédup propre).
  * Non bloquant : si la création échoue, le drag du lead aboutit quand
  * même (log côté serveur).
  */
@@ -542,12 +520,14 @@ async function createStageTask(
     last_name: string | null;
     company_name: string | null;
     assigned_to: string | null;
+    next_follow_up_at: string | null;
   },
   stage: LeadPipelineStage,
   userId: string
 ): Promise<void> {
   const template = STAGE_TASK_TEMPLATES[stage];
-  if (!template) return; // brut / verified : pas de tâche
+  if (!template) return; // stages hors scope (brut / verified / to_contact / to_email / in_discussion)
+  if (!lead.next_follow_up_at) return; // pas de date de relance → on ne crée rien
 
   // 1) Annule les tâches auto pending précédentes pour ce lead
   await supabase
@@ -558,7 +538,7 @@ async function createStageTask(
     .like("auto_origin", "lead_stage:%")
     .eq("status", "pending");
 
-  // 2) Crée la nouvelle tâche
+  // 2) Crée la nouvelle tâche avec la date posée par l'utilisateur
   const fullName =
     [lead.first_name, lead.last_name].filter(Boolean).join(" ") ||
     lead.company_name ||
@@ -569,7 +549,7 @@ async function createStageTask(
     description: template.description,
     status: "pending",
     priority: template.priority,
-    due_date: addDays(new Date(), template.due_in),
+    due_date: lead.next_follow_up_at.slice(0, 10), // timestamptz → YYYY-MM-DD
     related_type: "lead_import",
     related_id: lead.id,
     assigned_to: lead.assigned_to ?? userId,
@@ -606,7 +586,7 @@ export async function updateLeadStage(
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage")
+    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage, next_follow_up_at")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -624,7 +604,8 @@ export async function updateLeadStage(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Crée la tâche auto liée au nouveau stage (si applicable)
+  // Crée la tâche de relance liée au nouveau stage si conditions réunies
+  // (stage contacted/stand_by + next_follow_up_at posé).
   if (lead.pipeline_stage !== stage) {
     await createStageTask(supabase, lead, stage, user.id);
   }
@@ -661,7 +642,7 @@ export async function updateLeadStageAndAssignee(
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage")
+    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage, next_follow_up_at")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -683,7 +664,8 @@ export async function updateLeadStageAndAssignee(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Crée la tâche auto liée au nouveau stage (avec le nouvel assignee)
+  // Crée la tâche de relance liée au nouveau stage (avec le nouvel assignee)
+  // si conditions réunies (stage contacted/stand_by + next_follow_up_at posé).
   if (lead.pipeline_stage !== stage) {
     await createStageTask(
       supabase,
@@ -715,7 +697,7 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("id, status, pipeline_stage, first_name, last_name, company_name, assigned_to")
+    .select("id, status, pipeline_stage")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -741,10 +723,9 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Si on a basculé en 'to_contact', créer la tâche auto associée
-  if (stageChanged) {
-    await createStageTask(supabase, lead, "to_contact", user.id);
-  }
+  // `to_contact` n'a pas de template de relance auto — qualifier un lead
+  // ne crée donc aucune tâche. L'utilisateur peut poser une date de relance
+  // dans le drawer puis drag vers `contacted` / `stand_by` pour la générer.
 
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/taches");
