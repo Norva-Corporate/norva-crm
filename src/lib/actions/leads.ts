@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -444,17 +445,20 @@ export async function updateLead(
   }
 
   // Si la date de relance a été modifiée, recréer / annuler la tâche
-  // auto en conséquence (et sync GCal). Couvre le cas où l'utilisateur
-  // pose une date depuis le drawer sur un lead déjà placé en
-  // contacted/stand_by — sans cela, aucune tâche ne serait créée tant
-  // qu'il ne re-drag pas le lead.
+  // auto + sync GCal. On le fait en `after()` pour que la server action
+  // rende la main au client dès que le lead est sauvé (le drawer peut
+  // ainsi refléter la nouvelle valeur instantanément, sans attendre
+  // les 3 DB roundtrips + sync GCal qui prennent ~500ms-1s).
   if ("next_follow_up_at" in cleaned) {
-    await ensureLeadFollowUpTask(
-      supabase,
-      data as LeadImport & { pipeline_stage: LeadPipelineStage },
-      user.id
-    );
-    revalidatePath("/dashboard/taches");
+    const fullLead = data as LeadImport & {
+      pipeline_stage: LeadPipelineStage;
+    };
+    const uid = user.id;
+    after(async () => {
+      const sb = await createClient();
+      await ensureLeadFollowUpTask(sb, fullLead, uid);
+      revalidatePath("/dashboard/taches");
+    });
   }
 
   revalidatePath("/dashboard/pipeline");
@@ -556,22 +560,33 @@ async function ensureLeadFollowUpTask(
   const template = STAGE_TASK_TEMPLATES[lead.pipeline_stage];
   const shouldHaveTask = !!template && !!lead.next_follow_up_at;
 
-  // 1) Annule les tâches auto pending précédentes pour ce lead
-  //    (toujours fait, même si on ne va pas en créer de nouvelle).
-  const { data: cancelled } = await supabase
+  // 1) Récupère les IDs des tâches auto pending précédentes pour ce lead.
+  //    On les sync vers GCal AVANT de DELETE pour que loadTaskEvent puisse
+  //    encore les lire (status='pending') et déclencher la suppression de
+  //    l'event côté Google. Une fois la sync lancée (fire-and-forget), on
+  //    DELETE les rows — pas besoin de garder une trace 'cancelled' dans
+  //    /dashboard/taches.
+  const { data: toDelete } = await supabase
     .from("tasks")
-    .update({ status: "cancelled" })
+    .select("id")
     .eq("related_type", "lead_import")
     .eq("related_id", lead.id)
     .like("auto_origin", "lead_stage:%")
-    .eq("status", "pending")
-    .select("id");
+    .eq("status", "pending");
 
-  // Sync les tâches annulées vers GCal (retire l'event)
-  for (const t of cancelled ?? []) {
-    void syncEntityToAllConnectedUsers("task", t.id).catch((e) =>
-      console.error("[ensureLeadFollowUpTask] sync cancel:", e)
-    );
+  const idsToDelete = (toDelete ?? []).map((t) => t.id);
+  if (idsToDelete.length > 0) {
+    // Sync GCal d'abord (lit la row avant suppression)
+    for (const id of idsToDelete) {
+      void syncEntityToAllConnectedUsers("task", id).catch((e) =>
+        console.error("[ensureLeadFollowUpTask] sync delete:", e)
+      );
+    }
+    // Puis DELETE — laisse un instant à la sync pour lire la row.
+    // En pratique syncEntityToAllConnectedUsers commence par lire le
+    // mapping calendar_event_links (qui sait quel event Google supprimer),
+    // donc on peut DELETE la task tout de suite.
+    await supabase.from("tasks").delete().in("id", idsToDelete);
   }
 
   if (!shouldHaveTask) return; // pas de date posée ou stage hors scope
