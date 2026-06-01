@@ -60,7 +60,7 @@ const ACTION_STAGES: LeadWithDedup["pipeline_stage"][] = [
   "in_discussion",
 ];
 
-export function LeadCard({
+function LeadCardImpl({
   lead,
   onOpen,
   overlay = false,
@@ -359,6 +359,11 @@ export function LeadCard({
     </div>
   );
 }
+
+// React.memo : évite les rerenders inutiles dans le kanban quand une autre
+// carte change. Comparaison superficielle suffit — les callbacks (onOpen,
+// onStageChanged) sont stabilisés en amont via useCallback.
+export const LeadCard = React.memo(LeadCardImpl);
 
 // ============================================================
 // Bouton "→ Créer deal" (stage='in_discussion')

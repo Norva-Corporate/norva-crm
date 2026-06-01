@@ -225,7 +225,23 @@ export function PipelineKanban({
       if (!result.success && leadsSnapshot.current) {
         const snap = leadsSnapshot.current;
         onLeadsChange(() => snap);
+        leadsSnapshot.current = null;
+        return;
       }
+
+      // Feedback UX : si on arrive sur contacted/stand_by sans date de
+      // relance posée, aucune tâche n'est créée — l'utilisateur doit le
+      // savoir explicitement, sinon il pense que la feature est cassée.
+      if (
+        (finalStage === "contacted" || finalStage === "stand_by") &&
+        !lead.next_follow_up_at
+      ) {
+        toast.info(
+          "Pas de date de relance posée — aucune tâche créée. Ouvre la fiche du lead pour en poser une.",
+          { duration: 6000 }
+        );
+      }
+
       leadsSnapshot.current = null;
       return;
     }

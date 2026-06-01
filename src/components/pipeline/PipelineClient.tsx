@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useTransition } from "react";
+import React, { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutGrid, List } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -81,44 +81,70 @@ export function PipelineClient({
     [deals]
   );
 
-  function openCreate() {
+  // Handlers stabilisés via useCallback : permet à PipelineKanban + ses
+  // sous-composants (LeadCard, DealCard mémoïsés) de skip les rerenders
+  // quand seul un state interne du parent change (ex : ouverture drawer).
+  const openCreate = useCallback(() => {
     setEditingDeal(null);
     setCreatingInStage(undefined);
     setDrawerOpen(true);
-  }
+  }, []);
 
-  function openCreateInStage(stage: DealStage) {
+  const openCreateInStage = useCallback((stage: DealStage) => {
     setEditingDeal(null);
     setCreatingInStage(stage);
     setDrawerOpen(true);
-  }
+  }, []);
 
-  function openEdit(deal: DealWithRelations) {
+  const openEdit = useCallback((deal: DealWithRelations) => {
     setEditingDeal(deal);
     setCreatingInStage(undefined);
     setDrawerOpen(true);
-  }
+  }, []);
 
-  function handleSaved(deal: DealWithRelations, mode: "create" | "update") {
-    if (mode === "create") {
-      setDeals((prev) => [deal, ...prev]);
-    } else {
-      setDeals((prev) => prev.map((d) => (d.id === deal.id ? deal : d)));
-    }
-    startTransition(() => router.refresh());
-  }
+  const handleSaved = useCallback(
+    (deal: DealWithRelations, mode: "create" | "update") => {
+      if (mode === "create") {
+        setDeals((prev) => [deal, ...prev]);
+      } else {
+        setDeals((prev) => prev.map((d) => (d.id === deal.id ? deal : d)));
+      }
+      startTransition(() => router.refresh());
+    },
+    [router]
+  );
 
-  function handleDeletedFromDrawer(id: string) {
-    setDeals((prev) => prev.filter((d) => d.id !== id));
-    startTransition(() => router.refresh());
-  }
+  const handleDeletedFromDrawer = useCallback(
+    (id: string) => {
+      setDeals((prev) => prev.filter((d) => d.id !== id));
+      startTransition(() => router.refresh());
+    },
+    [router]
+  );
 
-  function handleStageChangedFromDrawer(id: string, stage: DealStage) {
-    setDeals((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, stage } : d))
-    );
-    startTransition(() => router.refresh());
-  }
+  const handleStageChangedFromDrawer = useCallback(
+    (id: string, stage: DealStage) => {
+      setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, stage } : d)));
+      startTransition(() => router.refresh());
+    },
+    [router]
+  );
+
+  // Setters stables pour PipelineKanban (évite la réf qui change à chaque render)
+  const handleLeadsChange = useCallback(
+    (updater: (prev: LeadWithDedup[]) => LeadWithDedup[]) =>
+      setLeads((prev) => updater(prev)),
+    []
+  );
+  const handleDealsChange = useCallback(
+    (updater: (prev: DealWithRelations[]) => DealWithRelations[]) =>
+      setDeals((prev) => updater(prev)),
+    []
+  );
+  const handleOpenLead = useCallback(
+    (lead: LeadWithDedup) => setOpenLead(lead),
+    []
+  );
 
   function handleDeleteFromList() {
     if (!deleting) return Promise.resolve({ success: true } as const);
@@ -195,11 +221,9 @@ export function PipelineClient({
                 leads={leads}
                 deals={deals}
                 profiles={leadProfiles}
-                onLeadsChange={(updater) =>
-                  setLeads((prev) => updater(prev))
-                }
-                onDealsChange={(updater) => setDeals((prev) => updater(prev))}
-                onOpenLead={(lead) => setOpenLead(lead)}
+                onLeadsChange={handleLeadsChange}
+                onDealsChange={handleDealsChange}
+                onOpenLead={handleOpenLead}
                 onOpenDeal={openEdit}
                 onCreateDealInStage={openCreateInStage}
               />
