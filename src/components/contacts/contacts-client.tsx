@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ContactDrawer } from "@/components/contacts/ContactDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
+import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { deleteContact } from "@/lib/actions/contacts";
 import { getInitials, formatDate, cn } from "@/lib/utils";
 import type { Contact, Company } from "@/types";
@@ -117,6 +118,20 @@ export function ContactsClient({ initialContacts, companies }: Props) {
           <span className="text-xs text-muted-foreground">
             {filtered.length} contact{filtered.length > 1 ? "s" : ""}
           </span>
+          <ExportCsvButton
+            rows={filtered}
+            filenamePrefix="contacts"
+            columns={[
+              { header: "Prénom", get: (c) => c.first_name },
+              { header: "Nom", get: (c) => c.last_name },
+              { header: "Email", get: (c) => c.email },
+              { header: "Téléphone", get: (c) => c.phone },
+              { header: "Fonction", get: (c) => c.role },
+              { header: "Entreprise", get: (c) => c.company?.name ?? "" },
+              { header: "Notes", get: (c) => c.notes },
+              { header: "Créé le", get: (c) => formatDate(c.created_at) },
+            ]}
+          />
         </div>
 
         {/* Mobile : liste de cartes */}

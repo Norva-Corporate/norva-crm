@@ -9,6 +9,8 @@ import React, {
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LayoutGrid, List, Search, Star } from "lucide-react";
 import { TO_CONTACT_OWNERS } from "@/lib/team";
+import { ExportCsvButton } from "@/components/ui/export-csv-button";
+import { formatDate } from "@/lib/utils";
 import { Header } from "@/components/layout/header";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { PipelineKanban } from "./PipelineKanban";
@@ -354,6 +356,28 @@ export function PipelineClient({
                 <Star className="h-3.5 w-3.5" />
                 Top qualité
               </button>
+
+              {/* Export CSV — leads + deals visibles dans le kanban */}
+              <ExportCsvButton
+                rows={leads}
+                filenamePrefix="leads"
+                label="Exporter leads"
+                columns={[
+                  { header: "Prénom", get: (l) => l.first_name },
+                  { header: "Nom", get: (l) => l.last_name },
+                  { header: "Email", get: (l) => l.email },
+                  { header: "Téléphone", get: (l) => l.phone },
+                  { header: "Fonction", get: (l) => l.role },
+                  { header: "Entreprise", get: (l) => l.company_name },
+                  { header: "Domaine", get: (l) => l.company_domain },
+                  { header: "Stage", get: (l) => l.pipeline_stage },
+                  { header: "Status", get: (l) => l.status },
+                  { header: "Quality", get: (l) => l.quality_score },
+                  { header: "Owner", get: (l) => l.assignee?.full_name ?? l.assignee?.email ?? "" },
+                  { header: "Prochaine relance", get: (l) => l.next_follow_up_at?.slice(0, 10) ?? "" },
+                  { header: "Importé le", get: (l) => formatDate(l.imported_at) },
+                ]}
+              />
             </>
           )}
 

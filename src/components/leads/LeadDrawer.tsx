@@ -148,14 +148,21 @@ export function LeadDrawer({
     setTags(null);
     setAssociatedDeal(null);
     let cancelled = false;
-    getLeadDetails(leadProp.id).then((d) => {
+    // Différer le fetch détails (activities + tags + associatedDeal) de
+    // 100ms : l'animation d'ouverture du drawer a le temps de finir avant
+    // qu'on charge le contenu lourd (≈3 DB queries). Améliore l'INP perçu.
+    const handle = setTimeout(() => {
       if (cancelled) return;
-      setActivities(d.activities as unknown as Activity[]);
-      setTags(d.tags);
-      setAssociatedDeal(d.associatedDeal);
-    });
+      getLeadDetails(leadProp.id).then((d) => {
+        if (cancelled) return;
+        setActivities(d.activities as unknown as Activity[]);
+        setTags(d.tags);
+        setAssociatedDeal(d.associatedDeal);
+      });
+    }, 100);
     return () => {
       cancelled = true;
+      clearTimeout(handle);
     };
   }, [leadProp]);
 

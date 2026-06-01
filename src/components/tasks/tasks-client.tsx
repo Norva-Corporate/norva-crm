@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useTransition } from "react";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,7 +12,11 @@ import {
   Clock,
   AlertCircle,
   Flame,
+  CalendarDays,
+  Bell,
+  BellOff,
 } from "lucide-react";
+import { useBrowserNotifications } from "@/hooks/use-browser-notifications";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,6 +107,37 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
 
   const today = startOfTodayISO();
   const weekEnd = endOfWeekISO();
+
+  // Notification browser pour tâches dues aujourd'hui (une notif/jour max,
+  // n'apparait que si l'app n'est pas focus — comportement du hook).
+  const { permission, requestPermission, notify } = useBrowserNotifications();
+  const dueTodayPendingCount = useMemo(
+    () =>
+      initialTasks.filter(
+        (t) =>
+          t.due_date === today &&
+          (t.status === "pending" || t.status === "in_progress")
+      ).length,
+    [initialTasks, today]
+  );
+  useEffect(() => {
+    if (permission !== "granted" || dueTodayPendingCount === 0) return;
+    if (typeof window === "undefined") return;
+    const lastKey = "norva.tasks.lastNotifyDate";
+    if (window.localStorage.getItem(lastKey) === today) return;
+    notify(
+      `${dueTodayPendingCount} tâche${
+        dueTodayPendingCount > 1 ? "s" : ""
+      } due${dueTodayPendingCount > 1 ? "s" : ""} aujourd'hui`,
+      {
+        body: "Ouvre Norva CRM pour les traiter.",
+        onClick: () => {
+          window.location.href = "/dashboard/taches";
+        },
+      }
+    );
+    window.localStorage.setItem(lastKey, today);
+  }, [permission, dueTodayPendingCount, notify, today]);
 
   // Liste des projets visibles parmi les tâches (pour le dropdown filtre)
   const availableProjects = useMemo(() => {
@@ -242,6 +277,43 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
                 {f.label}
               </button>
             ))}
+            <Link
+              href="/dashboard/calendrier"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-[var(--muted)] text-muted-foreground hover:text-foreground transition-colors"
+              title="Voir les tâches (et autres échéances) dans le calendrier"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Calendrier
+            </Link>
+            {permission === "default" && (
+              <button
+                type="button"
+                onClick={requestPermission}
+                title="Activer les notifications navigateur pour les tâches dues aujourd'hui"
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-[var(--muted)] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Activer notifs
+              </button>
+            )}
+            {permission === "granted" && (
+              <span
+                title="Notifications activées — une alerte par jour si tâches dues"
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-success/15 text-success"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Notifs ON
+              </span>
+            )}
+            {permission === "denied" && (
+              <span
+                title="Notifications bloquées par le navigateur — autorise-les dans les paramètres du site"
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-destructive/15 text-destructive"
+              >
+                <BellOff className="h-3.5 w-3.5" />
+                Notifs bloquées
+              </span>
+            )}
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {STATUS_FILTERS.map((f) => (
