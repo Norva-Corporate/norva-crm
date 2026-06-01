@@ -86,7 +86,7 @@ interface Props {
 }
 
 export function LeadDrawer({
-  lead,
+  lead: leadProp,
   companies,
   profiles,
   onOpenChange,
@@ -99,6 +99,13 @@ export function LeadDrawer({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // État local du lead — mirror du prop, mis à jour aussi après chaque save
+  // inline (saveText, saveDateField, saveBudget, saveScore) pour que l'UI
+  // reflète le nouveau état sans attendre un re-fetch du parent. Sans ça,
+  // useInlineOptimistic reset à la propValue (= ancienne valeur) après la
+  // transition → user pense que la sauvegarde a échoué.
+  const [lead, setLead] = useState<LeadWithDedup | null>(leadProp);
+
   const [activities, setActivities] = useState<Activity[] | null>(null);
   const [tags, setTags] = useState<Tag[] | null>(null);
   const [associatedDeal, setAssociatedDeal] = useState<{
@@ -107,18 +114,23 @@ export function LeadDrawer({
     stage: string;
   } | null>(null);
 
+  // Sync lead state avec le prop quand on ouvre un autre lead.
   useEffect(() => {
-    if (!lead) return;
+    setLead(leadProp);
+  }, [leadProp]);
+
+  useEffect(() => {
+    if (!leadProp) return;
     setConvertMode(false);
     setError(null);
-    if (lead.existing_company_id) {
-      setCompanyChoice(lead.existing_company_id);
+    if (leadProp.existing_company_id) {
+      setCompanyChoice(leadProp.existing_company_id);
       setCompanyName("");
       setCompanyDomain("");
-    } else if (lead.company_name || lead.company_domain) {
+    } else if (leadProp.company_name || leadProp.company_domain) {
       setCompanyChoice(NEW_COMPANY);
-      setCompanyName(lead.company_name ?? "");
-      setCompanyDomain(lead.company_domain ?? "");
+      setCompanyName(leadProp.company_name ?? "");
+      setCompanyDomain(leadProp.company_domain ?? "");
     } else {
       setCompanyChoice(NO_COMPANY);
       setCompanyName("");
@@ -128,7 +140,7 @@ export function LeadDrawer({
     setTags(null);
     setAssociatedDeal(null);
     let cancelled = false;
-    getLeadDetails(lead.id).then((d) => {
+    getLeadDetails(leadProp.id).then((d) => {
       if (cancelled) return;
       setActivities(d.activities as unknown as Activity[]);
       setTags(d.tags);
@@ -137,7 +149,7 @@ export function LeadDrawer({
     return () => {
       cancelled = true;
     };
-  }, [lead]);
+  }, [leadProp]);
 
   if (!lead) {
     return (
@@ -150,12 +162,25 @@ export function LeadDrawer({
   // Capture id + initial values for stable closures.
   const leadId = lead.id;
 
+  // Helper unifié pour tous les saves inline : appelle updateLead, et si
+  // succès, patche aussi le state local `lead` pour que l'UI reflète
+  // immédiatement la nouvelle valeur (au lieu de revenir à la valeur du
+  // prop, qui n'a pas encore été refresh).
+  async function saveAndUpdate(patch: LeadUpdatePatch) {
+    const res = await updateLead(leadId, patch);
+    if (res.success) {
+      setLead((prev) =>
+        prev ? ({ ...prev, ...patch } as LeadWithDedup) : prev
+      );
+    }
+    return res;
+  }
+
   // Generic per-field saver. The form controls (InlineText/InlinePicker) all
   // hand back string|null, so we wrap that into the typed patch shape.
   function saveText(key: keyof LeadUpdatePatch) {
     return async (next: string | null) => {
-      const res = await updateLead(leadId, { [key]: next } as LeadUpdatePatch);
-      return res;
+      return saveAndUpdate({ [key]: next } as LeadUpdatePatch);
     };
   }
 
@@ -165,19 +190,19 @@ export function LeadDrawer({
     if (num != null && Number.isNaN(num)) {
       return { success: false as const, error: "Montant invalide." };
     }
-    return updateLead(leadId, { estimated_budget: num });
+    return saveAndUpdate({ estimated_budget: num });
   }
 
   // Score save: integer 1-5 or null.
   async function saveScore(next: number | null) {
-    return updateLead(leadId, { qualification_score: next });
+    return saveAndUpdate({ qualification_score: next });
   }
 
   // Date save for next_follow_up_at — input date returns YYYY-MM-DD which
   // Postgres casts cleanly to timestamptz.
   function saveDateField(key: keyof LeadUpdatePatch) {
     return async (next: string | null) => {
-      return updateLead(leadId, { [key]: next } as LeadUpdatePatch);
+      return saveAndUpdate({ [key]: next } as LeadUpdatePatch);
     };
   }
 
