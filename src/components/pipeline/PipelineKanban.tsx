@@ -267,9 +267,13 @@ export function PipelineKanban({
           ? await updateLeadStageAndAssignee(lead.id, finalStage, finalAssignee)
           : await updateLeadStage(lead.id, finalStage);
 
-      if (!result.success && leadsSnapshot.current) {
-        const snap = leadsSnapshot.current;
-        onLeadsChange(() => snap);
+      if (!result.success) {
+        // Rollback du state local + feedback explicite.
+        if (leadsSnapshot.current) {
+          const snap = leadsSnapshot.current;
+          onLeadsChange(() => snap);
+        }
+        toast.error(result.error ?? "Impossible de déplacer le lead.");
         leadsSnapshot.current = null;
         return;
       }

@@ -97,11 +97,17 @@ export async function listLeads(): Promise<LeadWithDedup[]> {
     .select(
       "*, assignee:profiles!lead_imports_assigned_to_fkey(id, email, full_name, avatar_url)"
     )
+    // Filtre serveur : seuls les leads "actifs" (pending / qualified) sont
+    // pertinents pour le kanban. Les converted/dismissed/duplicate sont
+    // terminaux — les charger gonflait inutilement le DOM (jusqu'à 158 leads
+    // dismissed sur 499 total) ET autorisait des drags impossibles côté
+    // serveur (rejet avec error, rollback côté client → faux sentiment de
+    // latence).
+    .in("status", ["pending", "qualified"])
     // Tri par `stage_updated_at` DESC : les leads activement travaillés
     // remontent en premier (un lead bougé dans le kanban aujourd'hui passe
     // devant un lead importé plus tard mais jamais touché). Fallback sur
-    // `imported_at` pour les leads dont le stage n'a jamais bougé. Pas de
-    // limite : on charge tout (kanban + vue liste s'appuient là-dessus).
+    // `imported_at` pour les leads dont le stage n'a jamais bougé.
     .order("stage_updated_at", { ascending: false, nullsFirst: false })
     .order("imported_at", { ascending: false });
   if (!leads) return [];
@@ -667,18 +673,20 @@ export async function updateLeadStage(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Crée la tâche de relance liée au nouveau stage si conditions réunies
-  // (stage contacted/stand_by + next_follow_up_at posé).
+  // Tâche de relance déférée via after() — le drag handler côté client
+  // attend uniquement le UPDATE du lead (~50ms), pas les 3+ DB roundtrips
+  // de ensureLeadFollowUpTask. Sans cela, le drag perd 500ms-1s.
   if (lead.pipeline_stage !== stage) {
-    await ensureLeadFollowUpTask(
-      supabase,
-      { ...lead, pipeline_stage: stage },
-      user.id
-    );
+    const fullLead = { ...lead, pipeline_stage: stage };
+    const uid = user.id;
+    after(async () => {
+      const sb = await createClient();
+      await ensureLeadFollowUpTask(sb, fullLead, uid);
+      revalidatePath("/dashboard/taches");
+    });
   }
 
   revalidatePath("/dashboard/pipeline");
-  revalidatePath("/dashboard/taches");
   return { success: true, data: null };
 }
 
@@ -731,18 +739,23 @@ export async function updateLeadStageAndAssignee(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Crée la tâche de relance liée au nouveau stage (avec le nouvel assignee)
-  // si conditions réunies (stage contacted/stand_by + next_follow_up_at posé).
+  // Tâche de relance déférée via after() — même raison que updateLeadStage :
+  // ne pas bloquer le drag handler sur des opérations non-critiques.
   if (lead.pipeline_stage !== stage) {
-    await ensureLeadFollowUpTask(
-      supabase,
-      { ...lead, assigned_to: assignedTo, pipeline_stage: stage },
-      user.id
-    );
+    const fullLead = {
+      ...lead,
+      assigned_to: assignedTo,
+      pipeline_stage: stage,
+    };
+    const uid = user.id;
+    after(async () => {
+      const sb = await createClient();
+      await ensureLeadFollowUpTask(sb, fullLead, uid);
+      revalidatePath("/dashboard/taches");
+    });
   }
 
   revalidatePath("/dashboard/pipeline");
-  revalidatePath("/dashboard/taches");
   return { success: true, data: null };
 }
 
