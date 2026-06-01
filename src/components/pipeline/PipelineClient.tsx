@@ -61,6 +61,17 @@ export function PipelineClient({
   const [view, setView] = useState<ViewMode>("kanban");
   const [openLead, setOpenLead] = useState<LeadWithDedup | null>(null);
 
+  // Re-sync les states locaux quand le server component re-fetch après
+  // un router.refresh() (par exemple suite à un dismiss / convert ou un
+  // nouveau lead Multica importé en arrière-plan). Sans ça, useState
+  // initial gèle les premières valeurs.
+  useEffect(() => {
+    setLeads(initialLeads);
+  }, [initialLeads]);
+  useEffect(() => {
+    setDeals(initialDeals);
+  }, [initialDeals]);
+
   // Toggle d'affichage des leads en stage 'brut' (la grosse majorité des
   // cards). Masquer par défaut diminue drastiquement le DOM rendu.
   // Persiste dans localStorage pour respecter le choix utilisateur.
@@ -172,6 +183,29 @@ export function PipelineClient({
   );
   const handleOpenLead = useCallback(
     (lead: LeadWithDedup) => setOpenLead(lead),
+    []
+  );
+
+  /** Sync le state local après dismiss/qualify/convert depuis le drawer.
+   *  Sans ça, le lead reste visible dans le kanban jusqu'à un refresh
+   *  manuel (useState(initialLeads) est gelé après le 1er mount). */
+  const handleLeadDrawerChanged = useCallback(
+    (
+      leadId: string,
+      change: { dismissed?: true; converted?: true; qualified?: true }
+    ) => {
+      if (change.dismissed || change.converted) {
+        // Status terminal → le lead sort du kanban
+        setLeads((prev) => prev.filter((l) => l.id !== leadId));
+      } else if (change.qualified) {
+        // Maj status local pour cohérence avec la vue liste
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === leadId ? { ...l, status: "qualified" } : l
+          )
+        );
+      }
+    },
     []
   );
 
@@ -315,6 +349,7 @@ export function PipelineClient({
         lead={openLead}
         companies={companies}
         profiles={leadProfiles}
+        onLeadChanged={handleLeadDrawerChanged}
         onOpenChange={(o) => !o && setOpenLead(null)}
         onSuccess={() => {
           setOpenLead(null);

@@ -83,6 +83,13 @@ interface Props {
   profiles: LeadAssignee[];
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** Callback appelé après dismiss/qualify/convert depuis le drawer pour
+   *  que le parent (PipelineClient) puisse filtrer/maj son state local
+   *  sans attendre router.refresh() (qui ne ré-hydrate pas useState). */
+  onLeadChanged?: (
+    leadId: string,
+    change: { dismissed?: true; converted?: true; qualified?: true }
+  ) => void;
 }
 
 export function LeadDrawer({
@@ -91,6 +98,7 @@ export function LeadDrawer({
   profiles,
   onOpenChange,
   onSuccess,
+  onLeadChanged,
 }: Props) {
   const [convertMode, setConvertMode] = useState(false);
   const [companyChoice, setCompanyChoice] = useState<string>(NO_COMPANY);
@@ -246,6 +254,7 @@ export function LeadDrawer({
         setError(res.error);
         return;
       }
+      onLeadChanged?.(leadId, { converted: true });
       onSuccess?.();
     });
   }
@@ -257,6 +266,7 @@ export function LeadDrawer({
         toast.error(res.error);
         return;
       }
+      onLeadChanged?.(leadId, { qualified: true });
       onSuccess?.();
     });
   }
@@ -268,6 +278,7 @@ export function LeadDrawer({
         toast.error(res.error);
         return;
       }
+      onLeadChanged?.(leadId, { dismissed: true });
       onSuccess?.();
     });
   }
