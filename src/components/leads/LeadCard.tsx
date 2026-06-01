@@ -22,6 +22,9 @@ import {
   Loader2,
   Hourglass,
   ArrowRight,
+  MoreHorizontal,
+  X,
+  CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatRelativeDate } from "@/lib/utils";
@@ -38,12 +41,28 @@ import {
   STAGNATION_COLOR,
 } from "./stages";
 import { AgentButton } from "@/components/agents/agent-button";
-import { convertLeadToDeal, updateLeadStage } from "@/lib/actions/leads";
+import {
+  convertLeadToDeal,
+  dismissLead,
+  qualifyLead,
+  updateLeadStage,
+} from "@/lib/actions/leads";
 import type { LeadPipelineStage, LeadWithDedup } from "@/lib/actions/leads";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LeadCardProps {
   lead: LeadWithDedup;
   onOpen: (lead: LeadWithDedup) => void;
+  /** Callback appelé après dismiss / qualify côté carte — permet au parent de retirer/maj le lead dans son state. */
+  onLeadChanged?: (
+    leadId: string,
+    change: { dismissed?: true; qualified?: true }
+  ) => void;
   /** Pour le DragOverlay : rend la card sans le hook sortable */
   overlay?: boolean;
   /** Mode mobile : pas de drag handle, affiche un select de stage */
@@ -63,6 +82,7 @@ const ACTION_STAGES: LeadWithDedup["pipeline_stage"][] = [
 function LeadCardImpl({
   lead,
   onOpen,
+  onLeadChanged,
   overlay = false,
   mobile = false,
   onStageChanged,
@@ -90,6 +110,34 @@ function LeadCardImpl({
       };
 
   const [stagePending, startStageTransition] = useTransition();
+  const [actionPending, startActionTransition] = useTransition();
+
+  function handleDismiss(e: React.MouseEvent | Event) {
+    e.stopPropagation();
+    startActionTransition(async () => {
+      const res = await dismissLead(lead.id);
+      if (!res.success) {
+        toast.error(res.error ?? "Impossible de rejeter le lead.");
+        return;
+      }
+      toast.success("Lead rejeté.");
+      onLeadChanged?.(lead.id, { dismissed: true });
+    });
+  }
+
+  function handleQualify(e: React.MouseEvent | Event) {
+    e.stopPropagation();
+    if (lead.status !== "pending") return;
+    startActionTransition(async () => {
+      const res = await qualifyLead(lead.id);
+      if (!res.success) {
+        toast.error(res.error ?? "Impossible de qualifier le lead.");
+        return;
+      }
+      toast.success("Lead qualifié.");
+      onLeadChanged?.(lead.id, { qualified: true });
+    });
+  }
 
   function handleStageChange(e: React.ChangeEvent<HTMLSelectElement>) {
     e.stopPropagation();
@@ -222,6 +270,44 @@ function LeadCardImpl({
                   />
                   {lead.quality_score}
                 </span>
+              )}
+              {/* Menu d'actions — visible sauf en overlay / mobile.
+                  Permet d'accéder à 'Rejeter' / 'Qualifier' sans ouvrir
+                  le drawer. Le lead reste en DB (dismissLead set
+                  status='dismissed') → pas de doublon en futur scraping. */}
+              {!overlay && !mobile && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Actions sur le lead"
+                      className="shrink-0 -mr-1 inline-flex items-center justify-center h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                      disabled={actionPending}
+                    >
+                      {actionPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {lead.status === "pending" && (
+                      <DropdownMenuItem onSelect={handleQualify}>
+                        <CheckSquare className="h-3.5 w-3.5" />
+                        Marquer qualifié
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onSelect={handleDismiss}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Rejeter
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>

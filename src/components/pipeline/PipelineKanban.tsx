@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -110,6 +110,25 @@ export function PipelineKanban({
     }
     return acc;
   }, [columns, leads, deals]);
+
+  /** Suppression optimiste d'un lead dismiss / mise à jour du status si qualified. */
+  const handleLeadChanged = useCallback(
+    (
+      leadId: string,
+      change: { dismissed?: true; qualified?: true }
+    ) => {
+      if (change.dismissed) {
+        onLeadsChange((prev) => prev.filter((l) => l.id !== leadId));
+      } else if (change.qualified) {
+        onLeadsChange((prev) =>
+          prev.map((l) =>
+            l.id === leadId ? { ...l, status: "qualified" } : l
+          )
+        );
+      }
+    },
+    [onLeadsChange]
+  );
 
   function findLead(id: string) {
     return leads.find((l) => l.id === id);
@@ -398,6 +417,7 @@ export function PipelineKanban({
                           key={it.lead.id}
                           lead={it.lead}
                           onOpen={onOpenLead}
+                          onLeadChanged={handleLeadChanged}
                         />
                       ) : (
                         <DealCard

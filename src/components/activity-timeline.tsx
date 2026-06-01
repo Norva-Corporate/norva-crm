@@ -86,7 +86,7 @@ interface Props {
   initialActivities: ActivityRow[];
 }
 
-export function ActivityTimeline({
+function ActivityTimelineImpl({
   entityType,
   entityId,
   initialActivities,
@@ -188,6 +188,10 @@ export function ActivityTimeline({
     </Card>
   );
 }
+
+// React.memo : évite les rerenders du timeline (souvent lourd, beaucoup
+// d'activités) quand le drawer parent re-rend pour un autre champ.
+export const ActivityTimeline = React.memo(ActivityTimelineImpl);
 
 function ActivityItem({ activity }: { activity: ActivityRow }) {
   const router = useRouter();

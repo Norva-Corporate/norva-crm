@@ -42,7 +42,7 @@ interface Props {
   className?: string;
 }
 
-export function EntityTags({
+function EntityTagsImpl({
   entityType,
   entityId,
   initialTags,
@@ -95,6 +95,11 @@ export function EntityTags({
     </div>
   );
 }
+
+// React.memo : initialTags est un tableau passé par le parent ; tant que
+// la référence ne change pas, on évite le re-render du composant + son
+// popover. Le state interne reste éphémère.
+export const EntityTags = React.memo(EntityTagsImpl);
 
 export function TagBadge({
   tag,
