@@ -43,6 +43,9 @@ interface PipelineKanbanProps {
   leads: LeadWithDedup[];
   deals: DealWithRelations[];
   profiles: LeadAssignee[];
+  /** Si false : la colonne 'Brut' et ses leads sont retirés du rendu
+   *  (réduit drastiquement le DOM quand le volume de leads bruts est gros). */
+  showBrut: boolean;
   onLeadsChange: (
     updater: (prev: LeadWithDedup[]) => LeadWithDedup[]
   ) => void;
@@ -62,6 +65,7 @@ export function PipelineKanban({
   leads,
   deals,
   profiles,
+  showBrut,
   onLeadsChange,
   onDealsChange,
   onOpenLead,
@@ -79,7 +83,29 @@ export function PipelineKanban({
     })
   );
 
-  const columns = useMemo(() => buildUnifiedColumns(profiles), [profiles]);
+  // Toutes les colonnes selon les profils — la liste de référence.
+  const allColumns = useMemo(() => buildUnifiedColumns(profiles), [profiles]);
+
+  // Colonnes effectivement affichées : on retire la colonne 'Brut' si
+  // showBrut=false, ce qui supprime le rendu de la column ET ses cards.
+  const columns = useMemo(
+    () =>
+      showBrut
+        ? allColumns
+        : allColumns.filter(
+            (c) => !(c.kind === "lead" && c.stage === "brut")
+          ),
+    [allColumns, showBrut]
+  );
+
+  // Leads filtrés selon showBrut.
+  const visibleLeads = useMemo(
+    () =>
+      showBrut
+        ? leads
+        : leads.filter((l) => l.pipeline_stage !== "brut"),
+    [leads, showBrut]
+  );
 
   const columnById = useMemo(() => {
     const m = new Map<string, UnifiedColumn>();
@@ -96,7 +122,7 @@ export function PipelineKanban({
       columns.find((c) => c.kind === "lead" && c.stage === "to_contact")?.id ??
       null;
 
-    for (const l of leads) {
+    for (const l of visibleLeads) {
       const colId = getLeadColumnId(l.pipeline_stage, l.assigned_to, columns);
       if (colId && acc[colId]) {
         acc[colId].push({ kind: "lead", lead: l });
@@ -109,7 +135,7 @@ export function PipelineKanban({
       if (acc[colId]) acc[colId].push({ kind: "deal", deal: d });
     }
     return acc;
-  }, [columns, leads, deals]);
+  }, [columns, visibleLeads, deals]);
 
   /** Suppression optimiste d'un lead dismiss / mise à jour du status si qualified. */
   const handleLeadChanged = useCallback(

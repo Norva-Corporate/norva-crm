@@ -162,15 +162,34 @@ export function LeadDrawer({
   // Capture id + initial values for stable closures.
   const leadId = lead.id;
 
-  // Helper unifié pour tous les saves inline : appelle updateLead, et si
-  // succès, patche aussi le state local `lead` pour que l'UI reflète
-  // immédiatement la nouvelle valeur (au lieu de revenir à la valeur du
-  // prop, qui n'a pas encore été refresh).
+  // Helper unifié pour tous les saves inline : optimistic update du state
+  // local AVANT le server call (évite le flash de retour à l'ancienne
+  // valeur causé par useInlineOptimistic qui reset son override à
+  // propValue à la fin de la transition). En cas d'erreur serveur, on
+  // rollback automatiquement aux valeurs précédentes + toast d'erreur.
   async function saveAndUpdate(patch: LeadUpdatePatch) {
+    // 1) Capture les valeurs actuelles pour rollback éventuel
+    const rollback: LeadUpdatePatch = {};
+    if (lead) {
+      for (const key of Object.keys(patch) as (keyof LeadUpdatePatch)[]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (rollback as any)[key] = (lead as any)[key] ?? null;
+      }
+    }
+
+    // 2) Optimistic update — le rendu reflète la nouvelle valeur dès
+    //    avant la réponse serveur.
+    setLead((prev) =>
+      prev ? ({ ...prev, ...patch } as LeadWithDedup) : prev
+    );
+
+    // 3) Server save
     const res = await updateLead(leadId, patch);
-    if (res.success) {
+
+    if (!res.success) {
+      // 4) Rollback
       setLead((prev) =>
-        prev ? ({ ...prev, ...patch } as LeadWithDedup) : prev
+        prev ? ({ ...prev, ...rollback } as LeadWithDedup) : prev
       );
     }
     return res;

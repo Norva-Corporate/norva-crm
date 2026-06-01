@@ -1,7 +1,13 @@
 "use client";
-import React, { useCallback, useMemo, useState, useTransition } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, List } from "lucide-react";
+import { Eye, EyeOff, LayoutGrid, List } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { PipelineKanban } from "./PipelineKanban";
@@ -54,6 +60,29 @@ export function PipelineClient({
   const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
   const [view, setView] = useState<ViewMode>("kanban");
   const [openLead, setOpenLead] = useState<LeadWithDedup | null>(null);
+
+  // Toggle d'affichage des leads en stage 'brut' (la grosse majorité des
+  // cards). Masquer par défaut diminue drastiquement le DOM rendu.
+  // Persiste dans localStorage pour respecter le choix utilisateur.
+  const BRUT_STORAGE_KEY = "norva.pipeline.showBrut";
+  const [showBrut, setShowBrut] = useState(false);
+  const [brutHydrated, setBrutHydrated] = useState(false);
+  useEffect(() => {
+    const stored = window.localStorage.getItem(BRUT_STORAGE_KEY);
+    if (stored === "1") setShowBrut(true);
+    setBrutHydrated(true);
+  }, []);
+  const handleToggleBrut = useCallback(() => {
+    setShowBrut((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(BRUT_STORAGE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }, []);
+  const brutCount = useMemo(
+    () => leads.filter((l) => l.pipeline_stage === "brut").length,
+    [leads]
+  );
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<DealWithRelations | null>(
@@ -196,6 +225,34 @@ export function PipelineClient({
             </div>
           </div>
 
+          {/* Toggle Bruts — uniquement en vue kanban, masque les leads
+              en stage 'brut' pour alléger drastiquement le DOM. */}
+          {view === "kanban" && brutHydrated && brutCount > 0 && (
+            <button
+              type="button"
+              onClick={handleToggleBrut}
+              className={cn(
+                "inline-flex items-center gap-1.5 h-7 px-2.5 text-xs border transition-colors",
+                showBrut
+                  ? "border-accent/40 text-accent bg-accent/10 hover:bg-accent/15"
+                  : "border-[var(--border)] text-muted-foreground hover:text-foreground hover:border-[var(--muted)]"
+              )}
+              title={
+                showBrut
+                  ? "Masquer la colonne Brut"
+                  : "Afficher la colonne Brut"
+              }
+            >
+              {showBrut ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+              {showBrut ? "Masquer les bruts" : "Afficher les bruts"}
+              <span className="font-mono tabular-nums">({brutCount})</span>
+            </button>
+          )}
+
           {/* Switcher Kanban / Liste */}
           <div className="inline-flex border border-[var(--border)] bg-[var(--surface)] p-0.5">
             <ViewButton
@@ -221,6 +278,7 @@ export function PipelineClient({
                 leads={leads}
                 deals={deals}
                 profiles={leadProfiles}
+                showBrut={showBrut}
                 onLeadsChange={handleLeadsChange}
                 onDealsChange={handleDealsChange}
                 onOpenLead={handleOpenLead}
