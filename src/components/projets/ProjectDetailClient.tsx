@@ -24,6 +24,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ApplyTemplateButton } from "@/components/task-templates/ApplyTemplateButton";
 import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
 import { TaskDrawer } from "@/components/tasks/TaskDrawer";
@@ -541,10 +542,16 @@ export function ProjectDetailClient({
               <ListChecks className="h-3 w-3" />
               Tâches du projet ({tasks.filter((t) => t.status !== "cancelled").length})
             </h2>
-            <Button size="sm" variant="outline" onClick={openTaskCreate}>
-              <Plus className="h-3.5 w-3.5" />
-              Nouvelle tâche
-            </Button>
+            <div className="flex items-center gap-2">
+              <ApplyTemplateButton
+                scope="project"
+                relatedId={project.id}
+              />
+              <Button size="sm" variant="outline" onClick={openTaskCreate}>
+                <Plus className="h-3.5 w-3.5" />
+                Nouvelle tâche
+              </Button>
+            </div>
           </div>
 
           {tasks.filter((t) => t.status !== "cancelled").length === 0 ? (

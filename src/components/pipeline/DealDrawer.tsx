@@ -35,6 +35,7 @@ import { getTagsForEntity } from "@/lib/actions/tags";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { AgentButton } from "@/components/agents/agent-button";
 import { DriveFolderButton } from "@/components/integrations/drive-folder-button";
+import { ApplyTemplateButton } from "@/components/task-templates/ApplyTemplateButton";
 import { Target } from "lucide-react";
 import type {
   DealStage,
@@ -354,6 +355,17 @@ export function DealDrawer({
                     kind="deal"
                     id={deal.id}
                     initialUrl={deal.drive_folder_url ?? null}
+                  />
+                </div>
+              )}
+
+              {/* Templates de tâches (édition uniquement) */}
+              {isEdit && deal?.id && (
+                <div className="space-y-1.5">
+                  <Label>Tâches</Label>
+                  <ApplyTemplateButton
+                    scope="deal"
+                    relatedId={deal.id}
                   />
                 </div>
               )}
