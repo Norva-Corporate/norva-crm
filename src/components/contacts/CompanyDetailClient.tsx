@@ -519,8 +519,13 @@ function ExternalSourcesCard({ company }: { company: Company }) {
     website: company.website,
     company_name: company.name,
     // Location dérivable depuis address — heuristique simple : on prend
-    // le dernier segment après virgule (souvent la ville).
+    // le dernier segment après virgule (souvent la ville). Sert au lien
+    // Pages Jaunes (recherche par nom + ville).
     location: company.address?.split(",").slice(-1)[0]?.trim() ?? null,
+    // address complète : préférée par le fallback Google Maps quand pas
+    // de place_id ni d'URL canonique. Couvre Le Buffet des Saveurs et
+    // toute company créée hors lead.
+    address: company.address,
   });
   if (items.length === 0) return null;
 

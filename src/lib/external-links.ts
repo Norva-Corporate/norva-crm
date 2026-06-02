@@ -38,10 +38,12 @@ export interface ExternalLinksInput {
   siren?: string | null;
   linkedin?: string | null;
   website?: string | null;
-  /** Nom de l'entreprise pour la recherche Pages Jaunes / fallback. */
+  /** Nom de l'entreprise pour la recherche Pages Jaunes / fallback Maps. */
   company_name?: string | null;
-  /** Ville pour la recherche Pages Jaunes. */
+  /** Ville pour la recherche Pages Jaunes / fallback Maps si address absent. */
   location?: string | null;
+  /** Adresse complète. Préférée à `location` pour le fallback Maps (plus précis). */
+  address?: string | null;
 }
 
 /**
@@ -88,7 +90,23 @@ export function buildExternalLinks(
 ): ExternalLinkItem[] {
   const items: ExternalLinkItem[] = [];
 
-  const gmaps = buildGoogleMapsUrl(input);
+  // Google Maps : 3 niveaux de fallback :
+  //   1. URL canonique fournie (raw_payload.google_maps_url, ou colonne
+  //      companies.google_maps_url)
+  //   2. Construction depuis place_id (le plus précis, format /maps/place/?q=...)
+  //   3. Recherche textuelle par nom + adresse/ville (toujours dispo si
+  //      au moins le company_name existe — couvre les ~13% de leads sans
+  //      place_id, et les entreprises créées hors lead)
+  let gmaps = buildGoogleMapsUrl(input);
+  if (!gmaps && input.company_name) {
+    const queryParts = [
+      input.company_name,
+      input.address || input.location || "",
+    ].filter(Boolean);
+    gmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      queryParts.join(" ")
+    )}`;
+  }
   if (gmaps) {
     items.push({ id: "gmaps", url: gmaps, label: "Google Maps", icon: MapPin });
   }

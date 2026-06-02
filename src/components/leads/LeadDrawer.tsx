@@ -713,6 +713,10 @@ function buildLeadExternalLinks(lead: LeadWithDedup) {
     company_name: lead.company_name,
     location:
       typeof payload.location === "string" ? payload.location : null,
+    // address utilisée par le fallback Maps quand pas de place_id ni URL
+    // canonique. raw_payload.address est présent sur ~68% des leads.
+    address:
+      typeof payload.address === "string" ? payload.address : null,
   });
 }
 
