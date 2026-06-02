@@ -69,6 +69,10 @@ interface LeadCardProps {
   mobile?: boolean;
   /** Callback appelé après changement de stage (en mode mobile) */
   onStageChanged?: (newStage: LeadPipelineStage) => void;
+  /** Bulk select — état de cochage côté parent. */
+  selected?: boolean;
+  /** Bulk select — toggle déclenché par le click sur la checkbox. */
+  onToggleSelect?: (leadId: string) => void;
 }
 
 // Les stages où on propose des actions agent / conversion
@@ -86,11 +90,16 @@ function LeadCardImpl({
   overlay = false,
   mobile = false,
   onStageChanged,
+  selected = false,
+  onToggleSelect,
 }: LeadCardProps) {
+  // Quand une card est cochée, on désactive son drag pour signaler
+  // visuellement qu'on est en mode "bulk-edit" sur cette carte.
+  // Le mode reste actif tant qu'il y a au moins 1 lead coché côté parent.
   const sortable = useSortable({
     id: lead.id,
     data: { type: "lead", stage: lead.pipeline_stage },
-    disabled: overlay || mobile,
+    disabled: overlay || mobile || selected,
   });
 
   const {
@@ -188,7 +197,8 @@ function LeadCardImpl({
         "group relative bg-[#1C2A44] border border-[var(--border)] border-l-2 p-3 cursor-pointer transition-all",
         "hover:border-accent/30 hover:shadow-card-hover",
         isDragging && !overlay && "opacity-40",
-        overlay && "shadow-card-hover ring-1 ring-accent/40 cursor-grabbing"
+        overlay && "shadow-card-hover ring-1 ring-accent/40 cursor-grabbing",
+        selected && "ring-1 ring-accent border-accent/60 bg-[#243557]"
       )}
       data-stage={lead.pipeline_stage}
       onClick={() => !isDragging && onOpen(lead)}
@@ -201,22 +211,61 @@ function LeadCardImpl({
       />
 
       <div className="flex items-start gap-2">
-        {/* Drag handle — caché en mode mobile */}
+        {/* Colonne gauche : checkbox bulk-select + drag handle.
+            Checkbox visible toujours quand onToggleSelect est fourni (mode
+            kanban desktop). Quand selected, le drag est désactivé donc on
+            cache le grip et on met en avant la checkbox. */}
         {!mobile && (
-          <button
-            type="button"
-            aria-label="Déplacer"
-            className={cn(
-              "shrink-0 mt-0.5 -ml-1 text-muted-foreground/60 hover:text-foreground",
-              "cursor-grab active:cursor-grabbing transition-colors",
-              "opacity-50 group-hover:opacity-100"
+          <div className="shrink-0 -ml-1 flex flex-col items-center gap-1 mt-0.5">
+            {onToggleSelect && !overlay && (
+              <button
+                type="button"
+                aria-label={selected ? "Désélectionner" : "Sélectionner ce lead"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSelect(lead.id);
+                }}
+                className={cn(
+                  "inline-flex items-center justify-center h-4 w-4 border rounded-sm transition-all",
+                  selected
+                    ? "bg-accent border-accent text-white opacity-100"
+                    : "bg-[var(--background)]/70 border-[var(--border)] hover:border-accent/60 opacity-40 group-hover:opacity-100"
+                )}
+              >
+                {selected && (
+                  <svg
+                    viewBox="0 0 12 12"
+                    className="h-3 w-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path
+                      d="M2.5 6.5l2.5 2.5 4.5-5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
             )}
-            onClick={(e) => e.stopPropagation()}
-            {...(overlay ? {} : attributes)}
-            {...(overlay ? {} : listeners)}
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-          </button>
+            {!selected && (
+              <button
+                type="button"
+                aria-label="Déplacer"
+                className={cn(
+                  "text-muted-foreground/60 hover:text-foreground",
+                  "cursor-grab active:cursor-grabbing transition-colors",
+                  "opacity-50 group-hover:opacity-100"
+                )}
+                onClick={(e) => e.stopPropagation()}
+                {...(overlay ? {} : attributes)}
+                {...(overlay ? {} : listeners)}
+              >
+                <GripVertical className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         )}
 
         <div className="flex-1 min-w-0 space-y-2">

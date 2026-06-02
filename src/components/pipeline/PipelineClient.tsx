@@ -6,7 +6,7 @@ import React, {
   useState,
   useTransition,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, LayoutGrid, List, Search, Star } from "lucide-react";
 import { TO_CONTACT_OWNERS } from "@/lib/team";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
@@ -16,6 +16,7 @@ import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { PipelineKanban } from "./PipelineKanban";
 import { ListView } from "./ListView";
 import { DealDrawer } from "./DealDrawer";
+import { BulkActionBar } from "./BulkActionBar";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { OPEN_STAGES } from "./stages";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -58,6 +59,7 @@ export function PipelineClient({
   leadProfiles,
 }: PipelineClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const [deals, setDeals] = useState<DealWithRelations[]>(initialDeals);
   const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
@@ -131,6 +133,28 @@ export function PipelineClient({
 
   const [deleting, setDeleting] = useState<DealWithRelations | null>(null);
 
+  // Bulk select kanban — Set des leadIds sélectionnés. Clear quand on
+  // change de vue (Kanban → Liste) pour éviter une sélection invisible.
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const toggleLeadSelect = useCallback((leadId: string) => {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => {
+    setSelectedLeadIds(new Set());
+  }, []);
+  useEffect(() => {
+    if (view !== "kanban" && selectedLeadIds.size > 0) {
+      setSelectedLeadIds(new Set());
+    }
+  }, [view, selectedLeadIds.size]);
+
   const totalOpen = useMemo(
     () =>
       deals
@@ -167,6 +191,30 @@ export function PipelineClient({
     setCreatingInStage(undefined);
     setDrawerOpen(true);
   }, []);
+
+  // Auto-ouverture du drawer quand la palette globale (ou un autre lien)
+  // pousse `?open=lead:<id>` ou `?open=deal:<id>` sur l'URL. On nettoie
+  // l'URL après ouverture pour éviter de ré-ouvrir si le drawer est fermé.
+  useEffect(() => {
+    const param = searchParams.get("open");
+    if (!param) return;
+    const [kind, id] = param.split(":");
+    if (!kind || !id) return;
+    if (kind === "lead") {
+      const target = leads.find((l) => l.id === id);
+      if (target) setOpenLead(target);
+    } else if (kind === "deal") {
+      const target = deals.find((d) => d.id === id);
+      if (target) {
+        setEditingDeal(target);
+        setCreatingInStage(undefined);
+        setDrawerOpen(true);
+      }
+    }
+    // Nettoie le param sans recharger la page.
+    router.replace("/dashboard/pipeline", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleSaved = useCallback(
     (deal: DealWithRelations, mode: "create" | "update") => {
@@ -443,6 +491,8 @@ export function PipelineClient({
                 onOpenLead={handleOpenLead}
                 onOpenDeal={openEdit}
                 onCreateDealInStage={openCreateInStage}
+                selectedLeadIds={selectedLeadIds}
+                onToggleLeadSelect={toggleLeadSelect}
               />
             </div>
           ) : (
@@ -488,6 +538,17 @@ export function PipelineClient({
         itemType="le deal"
         itemName={deleting?.title ?? ""}
         onConfirm={handleDeleteFromList}
+      />
+
+      {/* Bulk actions — sticky bottom-centrée, n'apparaît qu'avec ≥1 lead
+          sélectionné. Le `router.refresh()` post-action garantit que la DB
+          se reflète dans l'UI (les leads dismissed/convertis sortent du
+          state via la re-sync useEffect([initialLeads])). */}
+      <BulkActionBar
+        selectedIds={Array.from(selectedLeadIds)}
+        profiles={leadProfiles}
+        onClear={clearSelection}
+        onDone={() => startTransition(() => router.refresh())}
       />
     </>
   );

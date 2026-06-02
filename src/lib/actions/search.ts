@@ -6,6 +6,7 @@ export type SearchEntityType =
   | "contact"
   | "company"
   | "deal"
+  | "lead"
   | "project"
   | "invoice";
 
@@ -24,35 +25,49 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
   const supabase = await createClient();
   const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
 
-  const [contacts, companies, deals, projects, invoices] = await Promise.all([
-    supabase
-      .from("contacts")
-      .select("id, first_name, last_name, email")
-      .or(
-        `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`
-      )
-      .limit(5),
-    supabase
-      .from("companies")
-      .select("id, name, domain")
-      .ilike("name", like)
-      .limit(5),
-    supabase
-      .from("deals")
-      .select("id, title, stage, value")
-      .ilike("title", like)
-      .limit(5),
-    supabase
-      .from("projects")
-      .select("id, name, status")
-      .ilike("name", like)
-      .limit(5),
-    supabase
-      .from("invoices")
-      .select("id, number, type, total, status")
-      .ilike("number", like)
-      .limit(5),
-  ]);
+  const [contacts, companies, deals, leads, projects, invoices] =
+    await Promise.all([
+      supabase
+        .from("contacts")
+        .select("id, first_name, last_name, email")
+        .or(
+          `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like}`
+        )
+        .limit(5),
+      supabase
+        .from("companies")
+        .select("id, name, domain")
+        .ilike("name", like)
+        .limit(5),
+      supabase
+        .from("deals")
+        .select("id, title, stage, value")
+        .ilike("title", like)
+        .limit(5),
+      // Leads "actifs" uniquement (pas dismissed/converted/duplicate) :
+      // un lead converti devient un deal → on retrouve déjà la fiche via
+      // la recherche deals.
+      supabase
+        .from("lead_imports")
+        .select(
+          "id, first_name, last_name, company_name, email, pipeline_stage, status"
+        )
+        .in("status", ["pending", "qualified"])
+        .or(
+          `first_name.ilike.${like},last_name.ilike.${like},company_name.ilike.${like},email.ilike.${like}`
+        )
+        .limit(5),
+      supabase
+        .from("projects")
+        .select("id, name, status")
+        .ilike("name", like)
+        .limit(5),
+      supabase
+        .from("invoices")
+        .select("id, number, type, total, status")
+        .ilike("number", like)
+        .limit(5),
+    ]);
 
   const results: SearchResult[] = [];
 
@@ -97,7 +112,39 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       sublabel: [stageLabel[d.stage] ?? d.stage, value]
         .filter(Boolean)
         .join(" · "),
-      href: `/dashboard/pipeline`,
+      // ?open=deal:<id> ouvre le drawer dans PipelineClient (cf. useEffect
+      // qui lit ce param au mount et déclenche openEdit).
+      href: `/dashboard/pipeline?open=deal:${d.id}`,
+    });
+  }
+  for (const l of leads.data ?? []) {
+    const name =
+      [l.first_name, l.last_name].filter(Boolean).join(" ").trim() ||
+      l.company_name ||
+      l.email ||
+      "(sans nom)";
+    const stageLeadLabel: Record<string, string> = {
+      brut: "Brut",
+      verified: "Vérifié",
+      to_email: "À emailer",
+      to_contact: "À contacter",
+      email_sent: "Email envoyé",
+      contacted: "Contacté",
+      in_discussion: "En discussion",
+      stand_by: "Stand-by",
+    };
+    results.push({
+      type: "lead",
+      id: l.id,
+      label: name,
+      sublabel: [
+        stageLeadLabel[l.pipeline_stage] ?? l.pipeline_stage,
+        l.company_name && name !== l.company_name ? l.company_name : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      // ?open=lead:<id> ouvre le LeadDrawer dans PipelineClient.
+      href: `/dashboard/pipeline?open=lead:${l.id}`,
     });
   }
   for (const p of projects.data ?? []) {

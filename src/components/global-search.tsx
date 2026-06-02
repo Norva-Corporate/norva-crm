@@ -17,6 +17,7 @@ import {
   FolderKanban,
   FileText,
   Loader2,
+  UserSearch,
 } from "lucide-react";
 import {
   Dialog,
@@ -39,6 +40,7 @@ const TYPE_META: Record<
   contact: { label: "Contacts", icon: Users },
   company: { label: "Entreprises", icon: Building2 },
   deal: { label: "Deals", icon: Kanban },
+  lead: { label: "Leads", icon: UserSearch },
   project: { label: "Projets", icon: FolderKanban },
   invoice: { label: "Factures", icon: FileText },
 };
@@ -47,6 +49,7 @@ const ORDER: SearchEntityType[] = [
   "contact",
   "company",
   "deal",
+  "lead",
   "project",
   "invoice",
 ];

@@ -64,6 +64,9 @@ interface PipelineKanbanProps {
   onOpenLead: (lead: LeadWithDedup) => void;
   onOpenDeal: (deal: DealWithRelations) => void;
   onCreateDealInStage: (stage: DealStage) => void;
+  /** Set des leadIds sélectionnés (bulk actions). Undefined = pas de mode bulk. */
+  selectedLeadIds?: Set<string>;
+  onToggleLeadSelect?: (leadId: string) => void;
 }
 
 type ActiveItem =
@@ -83,6 +86,8 @@ export function PipelineKanban({
   onOpenLead,
   onOpenDeal,
   onCreateDealInStage,
+  selectedLeadIds,
+  onToggleLeadSelect,
 }: PipelineKanbanProps) {
   const isMobile = useIsMobile();
   const [active, setActive] = useState<ActiveItem | null>(null);
@@ -494,6 +499,8 @@ export function PipelineKanban({
                           lead={it.lead}
                           onOpen={onOpenLead}
                           onLeadChanged={handleLeadChanged}
+                          selected={selectedLeadIds?.has(it.lead.id) ?? false}
+                          onToggleSelect={onToggleLeadSelect}
                         />
                       ) : (
                         <DealCard

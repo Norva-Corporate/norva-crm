@@ -946,3 +946,76 @@ export async function listProfilesLight(): Promise<LeadAssignee[]> {
     .order("full_name", { ascending: true });
   return (data ?? []) as LeadAssignee[];
 }
+
+// ============================================================
+// Batch actions (bulk select kanban)
+// ============================================================
+// Wrappers naïfs autour des actions unitaires. `Promise.all` lance tout
+// en parallèle, on collecte les erreurs et on retourne un récap. Pas de
+// transaction (Supabase RPC + n queries chacun), mais ces actions sont
+// déjà idempotentes individuellement : un échec partiel laisse la DB
+// dans un état cohérent (les leads traités sont bien à jour).
+
+export interface BatchResult {
+  ok: number;
+  failed: number;
+  errors: string[];
+}
+
+async function runBatch<T>(
+  ids: string[],
+  fn: (id: string) => Promise<ActionResult<T>>
+): Promise<BatchResult> {
+  if (ids.length === 0) return { ok: 0, failed: 0, errors: [] };
+  const results = await Promise.all(ids.map(fn));
+  let ok = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  for (const r of results) {
+    if (r.success) ok++;
+    else {
+      failed++;
+      if (r.error) errors.push(r.error);
+    }
+  }
+  return { ok, failed, errors };
+}
+
+export async function dismissLeadsBatch(ids: string[]): Promise<BatchResult> {
+  return runBatch(ids, dismissLead);
+}
+
+export async function qualifyLeadsBatch(ids: string[]): Promise<BatchResult> {
+  // qualifyLead vérifie déjà `status='pending'` ; les leads déjà
+  // qualifiés échouent silencieusement (errors.length augmente).
+  return runBatch(ids, qualifyLead);
+}
+
+export async function assignLeadsBatch(
+  ids: string[],
+  assigneeId: string | null
+): Promise<BatchResult> {
+  if (ids.length === 0) return { ok: 0, failed: 0, errors: [] };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("lead_imports")
+    .update({ assigned_to: assigneeId })
+    .in("id", ids);
+  if (error) {
+    return { ok: 0, failed: ids.length, errors: [error.message] };
+  }
+  revalidatePath("/dashboard/pipeline");
+  return { ok: ids.length, failed: 0, errors: [] };
+}
+
+export async function convertLeadsToDealsBatch(
+  ids: string[],
+  dealStage?: import("@/types").DealStage
+): Promise<BatchResult> {
+  // convertLeadToDeal accepte un objet overrides ({ deal_stage, ... }).
+  // Pas de transaction : si la conversion 3/5 plante, les 2 premiers
+  // deals existent quand même (utile : on ne perd pas le travail).
+  return runBatch(ids, (id) =>
+    convertLeadToDeal(id, dealStage ? { deal_stage: dealStage } : undefined)
+  );
+}
