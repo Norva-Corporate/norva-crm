@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   Plug,
   Mail,
+  Target,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { label: "Projets", href: "/dashboard/projets", icon: FolderKanban },
   { label: "Facturation", href: "/dashboard/facturation", icon: FileText },
   { label: "Reporting", href: "/dashboard/reporting", icon: BarChart3 },
+  { label: "Objectifs", href: "/dashboard/objectifs", icon: Target },
   { label: "Intégrations", href: "/dashboard/integrations", icon: Plug },
 ];
 
