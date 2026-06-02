@@ -4,9 +4,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Search,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
   CheckCircle2,
   Circle,
   Clock,
@@ -22,12 +19,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActions } from "@/components/ui/row-actions";
 import { TaskDrawer } from "@/components/tasks/TaskDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteTask, updateTaskStatus } from "@/lib/actions/tasks";
@@ -493,26 +485,10 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
                       </div>
                     </div>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(t)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDeleting(t)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActions
+                      onEdit={() => openEdit(t)}
+                      onDelete={() => setDeleting(t)}
+                    />
                   </li>
                 );
               })}

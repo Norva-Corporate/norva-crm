@@ -1,25 +1,15 @@
 "use client";
 import React, { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Search,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { Search } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
+import { Th, TableHeadRow } from "@/components/ui/data-table";
+import { RowActions } from "@/components/ui/row-actions";
 import { deleteProject } from "@/lib/actions/projects";
 import { formatDate, cn } from "@/lib/utils";
 import { projectStatuses, projectStatusList } from "@/lib/statuses";
@@ -249,31 +239,10 @@ export function ProjetsClient({
                         </div>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(project)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDeleting(project)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActions
+                      onEdit={() => openEdit(project)}
+                      onDelete={() => setDeleting(project)}
+                    />
                   </div>
                 </Card>
               );
@@ -286,7 +255,7 @@ export function ProjetsClient({
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+                <TableHeadRow>
                   <Th>Nom</Th>
                   <Th>Client</Th>
                   <Th>Deal</Th>
@@ -296,7 +265,7 @@ export function ProjetsClient({
                   <Th>Fin</Th>
                   <Th>Avancement</Th>
                   <th className="w-10" />
-                </tr>
+                </TableHeadRow>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
@@ -378,28 +347,11 @@ export function ProjetsClient({
                           className="px-4 py-3"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => openEdit(project)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => setDeleting(project)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <RowActions
+                            onEdit={() => openEdit(project)}
+                            onDelete={() => setDeleting(project)}
+                            stopPropagation={false}
+                          />
                         </td>
                       </tr>
                     );
@@ -431,14 +383,6 @@ export function ProjetsClient({
         onConfirm={handleDelete}
       />
     </>
-  );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
-      {children}
-    </th>
   );
 }
 
