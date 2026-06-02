@@ -236,19 +236,57 @@ export async function convertLead(
       .trim()
       .toLowerCase() || null;
 
+    // Sources externes extraites du raw_payload du lead — préservées
+    // sur la company créée (ou ajoutées à une company existante si elle
+    // n'avait pas encore ces champs). Voir migration 045.
+    const rawPayload =
+      (lead.raw_payload as Record<string, unknown> | null) ?? {};
+    const sirenFromLead =
+      typeof rawPayload.siren === "string" ? rawPayload.siren : null;
+    const placeIdFromLead =
+      typeof rawPayload.place_id === "string" ? rawPayload.place_id : null;
+    const gmapsUrlFromLead =
+      typeof rawPayload.google_maps_url === "string"
+        ? rawPayload.google_maps_url
+        : null;
+
     // Try match by domain first
     if (domain) {
       const { data: existing } = await supabase
         .from("companies")
-        .select("id")
+        .select("id, siren, place_id, google_maps_url")
         .eq("domain", domain)
         .maybeSingle();
-      if (existing) companyId = existing.id;
+      if (existing) {
+        companyId = existing.id;
+        // Enrichit la company existante avec les sources lead si elles
+        // sont absentes (on n'écrase JAMAIS une valeur déjà présente —
+        // potentiellement saisie manuellement par l'utilisateur).
+        const patch: Record<string, string> = {};
+        if (!existing.siren && sirenFromLead) patch.siren = sirenFromLead;
+        if (!existing.place_id && placeIdFromLead)
+          patch.place_id = placeIdFromLead;
+        if (!existing.google_maps_url && gmapsUrlFromLead)
+          patch.google_maps_url = gmapsUrlFromLead;
+        if (Object.keys(patch).length > 0) {
+          await supabase
+            .from("companies")
+            .update(patch)
+            .eq("id", existing.id);
+        }
+      }
     }
     if (!companyId && name) {
       const { data: created, error: cErr } = await supabase
         .from("companies")
-        .insert({ name, domain, created_by: user.id })
+        .insert({
+          name,
+          domain,
+          siren: sirenFromLead,
+          place_id: placeIdFromLead,
+          google_maps_url: gmapsUrlFromLead,
+          created_by: user.id,
+        })
         .select("id")
         .single();
       if (cErr || !created) {

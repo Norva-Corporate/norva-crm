@@ -20,6 +20,11 @@ export interface Company {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  // Sources lead (migration 045) — auto-remplies à la conversion d'un lead
+  // depuis lead_imports.raw_payload. Voir src/lib/external-links.ts.
+  siren: string | null;
+  place_id: string | null;
+  google_maps_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

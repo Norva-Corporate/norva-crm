@@ -367,6 +367,10 @@ export interface CompanyWithCount {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  // Sources lead (migration 045) — utilisé par CompanyDetailClient.
+  siren: string | null;
+  place_id: string | null;
+  google_maps_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

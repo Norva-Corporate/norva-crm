@@ -35,12 +35,6 @@ import {
   Loader,
   Trophy,
   ArrowRight,
-  MapPin,
-  Building2,
-  FileText,
-  Briefcase,
-  Globe,
-  BookText,
   ExternalLink as ExternalLinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,6 +50,7 @@ import {
 } from "@/lib/actions/leads";
 import type { Activity, Tag } from "@/types";
 import { cn } from "@/lib/utils";
+import { buildExternalLinks } from "@/lib/external-links";
 
 const NEW_COMPANY = "__new__";
 const NO_COMPANY = "__none__";
@@ -697,118 +692,38 @@ function SectionSkeleton() {
 
 // ============================================================
 // External links — Google Maps, Societe.com, Pappers, LinkedIn,
-// Site web, Pages Jaunes. Construits à la volée depuis raw_payload
-// + colonnes du lead. N'affiche que les liens où la donnée existe.
+// Site web, Pages Jaunes. Délégué à `@/lib/external-links` (helper
+// partagé avec CompanyDetailClient depuis migration 045).
 // ============================================================
 
-type ExternalLinkItem = {
-  id: string;
-  url: string;
-  label: string;
-  Icon: React.ComponentType<{ className?: string }>;
-};
-
-function buildExternalLinks(lead: LeadWithDedup): ExternalLinkItem[] {
-  const items: ExternalLinkItem[] = [];
+function buildLeadExternalLinks(lead: LeadWithDedup) {
   const payload = (lead.raw_payload ?? {}) as Record<string, unknown>;
-
-  // 1. Google Maps — URL canonique si dispo, sinon construction depuis place_id
-  const gmapsUrl =
-    typeof payload.google_maps_url === "string"
-      ? payload.google_maps_url
-      : null;
-  const placeId =
-    typeof payload.place_id === "string" ? payload.place_id : null;
-  if (gmapsUrl) {
-    items.push({
-      id: "gmaps",
-      url: gmapsUrl,
-      label: "Google Maps",
-      Icon: MapPin,
-    });
-  } else if (placeId) {
-    const cleanedId = placeId.startsWith("places/") ? placeId.slice(7) : placeId;
-    items.push({
-      id: "gmaps",
-      url: `https://www.google.com/maps/place/?q=place_id:${cleanedId}`,
-      label: "Google Maps",
-      Icon: MapPin,
-    });
-  }
-
-  // 2 & 3. Societe.com + Pappers — depuis SIREN
-  const siren = typeof payload.siren === "string" ? payload.siren : null;
-  if (siren) {
-    items.push({
-      id: "societe",
-      url: `https://www.societe.com/cgi-bin/search?champs=${siren}`,
-      label: "Societe.com",
-      Icon: Building2,
-    });
-    items.push({
-      id: "pappers",
-      url: `https://www.pappers.fr/entreprise/${siren}`,
-      label: "Pappers",
-      Icon: FileText,
-    });
-  }
-
-  // 4. LinkedIn dirigeant — URL directe depuis raw_payload
-  const linkedin =
-    typeof payload.linkedin === "string" ? payload.linkedin : null;
-  if (linkedin) {
-    items.push({
-      id: "linkedin",
-      url: linkedin,
-      label: "LinkedIn dirigeant",
-      Icon: Briefcase,
-    });
-  }
-
-  // 5. Site web — depuis raw_payload.website ou company_domain
   const websiteRaw =
     typeof payload.website === "string" ? payload.website : null;
-  const fallbackDomain = lead.company_domain;
-  const finalWebsite = websiteRaw ?? fallbackDomain;
-  if (finalWebsite) {
-    const normalized = /^https?:\/\//i.test(finalWebsite)
-      ? finalWebsite
-      : `https://${finalWebsite}`;
-    items.push({
-      id: "website",
-      url: normalized,
-      label: "Site web",
-      Icon: Globe,
-    });
-  }
-
-  // 6. Pages Jaunes — depuis nom + ville
-  const location =
-    typeof payload.location === "string" ? payload.location : null;
-  if (lead.company_name && location) {
-    const params = new URLSearchParams({
-      quoiqui: lead.company_name,
-      ou: location,
-    });
-    items.push({
-      id: "pagesjaunes",
-      url: `https://www.pagesjaunes.fr/recherche/?${params.toString()}`,
-      label: "Pages Jaunes",
-      Icon: BookText,
-    });
-  }
-
-  return items;
+  return buildExternalLinks({
+    google_maps_url:
+      typeof payload.google_maps_url === "string"
+        ? payload.google_maps_url
+        : null,
+    place_id: typeof payload.place_id === "string" ? payload.place_id : null,
+    siren: typeof payload.siren === "string" ? payload.siren : null,
+    linkedin:
+      typeof payload.linkedin === "string" ? payload.linkedin : null,
+    website: websiteRaw ?? lead.company_domain ?? null,
+    company_name: lead.company_name,
+    location:
+      typeof payload.location === "string" ? payload.location : null,
+  });
 }
 
 function ExternalLinksSection({ lead }: { lead: LeadWithDedup }) {
-  const items = buildExternalLinks(lead);
+  const items = buildLeadExternalLinks(lead);
   if (items.length === 0) return null;
 
   return (
     <Section title="Liens externes">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-        {items.map(({ id, url, label, Icon }) => (
+        {items.map(({ id, url, label, icon: Icon }) => (
           <a
             key={id}
             href={url}

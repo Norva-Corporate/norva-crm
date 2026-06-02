@@ -28,6 +28,7 @@ import { EntityTags } from "@/components/tags/entity-tags";
 import { deleteCompany, patchCompany, type CompanyPatch } from "@/lib/actions/contacts";
 import { InlineText } from "@/components/ui/inline-text";
 import { getInitials, formatCurrency, formatDate, cn } from "@/lib/utils";
+import { buildExternalLinks } from "@/lib/external-links";
 import type {
   Company,
   Contact,
@@ -286,6 +287,11 @@ export function CompanyDetailClient({
           </div>
         </Card>
 
+        {/* Sources externes — Google Maps / Société.com / Pappers / etc.
+            Visible uniquement si au moins une source est dispo (migration 045
+            remplit ces champs depuis lead_imports.raw_payload à la conversion). */}
+        <ExternalSourcesCard company={company} />
+
         {/* Contacts */}
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
@@ -497,5 +503,52 @@ function InfoRow({
         <dd className="leading-tight">{children}</dd>
       </div>
     </div>
+  );
+}
+
+/**
+ * Section "Sources externes" — liens Google Maps / Société.com / Pappers /
+ * LinkedIn / Site web reconstruits via `buildExternalLinks`. Affiche
+ * seulement si au moins une source est dispo (silencieux sinon).
+ */
+function ExternalSourcesCard({ company }: { company: Company }) {
+  const items = buildExternalLinks({
+    google_maps_url: company.google_maps_url,
+    place_id: company.place_id,
+    siren: company.siren,
+    website: company.website,
+    company_name: company.name,
+    // Location dérivable depuis address — heuristique simple : on prend
+    // le dernier segment après virgule (souvent la ville).
+    location: company.address?.split(",").slice(-1)[0]?.trim() ?? null,
+  });
+  if (items.length === 0) return null;
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-sm font-semibold text-foreground mb-3">
+        Sources externes
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+        {items.map(({ id, url, label, icon: Icon }) => (
+          <a
+            key={id}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-[var(--muted)]/30 hover:text-accent transition-colors rounded-sm border border-transparent hover:border-[var(--border)]"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="flex-1 truncate">{label}</span>
+            <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+          </a>
+        ))}
+      </div>
+      {company.siren && (
+        <p className="text-[10px] text-muted-foreground mt-3 font-mono">
+          SIREN : {company.siren}
+        </p>
+      )}
+    </Card>
   );
 }
