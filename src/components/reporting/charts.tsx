@@ -148,6 +148,71 @@ export function PipelineByStageChart({
 // ============================================================
 // Funnel — conversion par stage (counts)
 // ============================================================
+/**
+ * Funnel lead → qualified → deal → won (4 étapes verticales).
+ * Affiche les chiffres absolus + le taux de drop entre étapes.
+ * Couleurs : bleu pour leads, jaune pour qualified, vert pour deals
+ * (created + won), pour rester cohérent avec la sémantique du CRM.
+ */
+export function LeadDealFunnel({
+  data,
+}: {
+  data: {
+    leads_imported: number;
+    leads_qualified: number;
+    deals_created: number;
+    deals_won: number;
+  };
+}) {
+  const steps = [
+    { key: "leads_imported", label: "Leads importés", value: data.leads_imported, color: "#3B82F6" },
+    { key: "leads_qualified", label: "Leads qualifiés", value: data.leads_qualified, color: "#F59E0B" },
+    { key: "deals_created", label: "Deals créés", value: data.deals_created, color: "#22C55E" },
+    { key: "deals_won", label: "Deals gagnés", value: data.deals_won, color: "#10B981" },
+  ];
+  const max = Math.max(1, ...steps.map((s) => s.value));
+  return (
+    <div className="space-y-1.5">
+      {steps.map((s, i) => {
+        const pct = (s.value / max) * 100;
+        const prev = i > 0 ? steps[i - 1].value : null;
+        const rate =
+          prev && prev > 0 ? Math.round((s.value / prev) * 100) : null;
+        return (
+          <div key={s.key} className="flex items-center gap-3">
+            <span className="text-xs text-foreground w-28 shrink-0">
+              {s.label}
+            </span>
+            <div className="flex-1 h-6 bg-[var(--muted)] rounded-sm overflow-hidden relative">
+              <div
+                className="h-full transition-all"
+                style={{ width: `${pct}%`, backgroundColor: s.color, opacity: 0.85 }}
+              />
+              <span className="absolute inset-0 flex items-center justify-end px-2 text-[11px] text-foreground font-mono">
+                {s.value}
+              </span>
+            </div>
+            <span
+              className={cn(
+                "text-[10px] w-14 text-right font-mono",
+                rate === null
+                  ? "text-muted-foreground"
+                  : rate < 30
+                  ? "text-destructive"
+                  : rate < 60
+                  ? "text-[#F59E0B]"
+                  : "text-[#22C55E]"
+              )}
+            >
+              {rate === null ? "" : `${rate}%`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ConversionFunnel({
   data,
 }: {

@@ -8,21 +8,39 @@ import {
   Trophy,
   Users,
   Building2,
+  Filter,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getReportData } from "@/lib/actions/reporting";
 import {
+  parseReportFilters,
+  getPeriodLabel,
+} from "@/lib/reporting-utils";
+import {
   MonthlyRevenueChart,
   PipelineByStageChart,
   ConversionFunnel,
+  LeadDealFunnel,
 } from "@/components/reporting/charts";
+import { ReportingToolbar } from "@/components/reporting/ReportingToolbar";
+import { listProfilesForPicker } from "@/lib/actions/pickers";
 import { formatCurrency } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportingPage() {
-  const data = await getReportData();
+export default async function ReportingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string; owner?: string }>;
+}) {
+  const resolved = await searchParams;
+  const filters = parseReportFilters(resolved);
+  const [data, profiles] = await Promise.all([
+    getReportData(filters),
+    listProfilesForPicker(),
+  ]);
+  const periodLabel = getPeriodLabel(filters.period);
 
   const kpis = [
     {
@@ -43,11 +61,11 @@ export default async function ReportingPage() {
       color: "text-[#60A5FA]",
     },
     {
-      title: "Taux de conversion 90j",
+      title: `Taux de conversion ${periodLabel}`,
       value: data.winRate == null ? "—" : `${data.winRate}%`,
       sub:
         data.winRate == null
-          ? "Aucun deal clôturé sur 90 jours"
+          ? `Aucun deal clôturé · ${periodLabel.toLowerCase()}`
           : `${data.winRateBase} deals clôturés`,
       icon: Target,
       bg: "bg-[#F59E0B]/10",
@@ -74,6 +92,12 @@ export default async function ReportingPage() {
       <Header title="Reporting" />
 
       <div className="flex-1 p-4 md:p-6 space-y-6 animate-fade-in">
+        {/* Toolbar filtres */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <ReportingToolbar profiles={profiles} />
+        </div>
+
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {kpis.map((k) => {
@@ -139,7 +163,7 @@ export default async function ReportingPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-3.5 w-3.5" />
-                Entonnoir de conversion
+                Entonnoir des deals
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -147,6 +171,22 @@ export default async function ReportingPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Funnel lead → qualified → deal → won (sur la période sélectionnée) */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-3.5 w-3.5" />
+              Funnel acquisition · {periodLabel}
+            </CardTitle>
+            <span className="text-[11px] text-muted-foreground">
+              Lead → Qualifié → Deal → Gagné
+            </span>
+          </CardHeader>
+          <CardContent>
+            <LeadDealFunnel data={data.leadFunnel} />
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Top clients */}
