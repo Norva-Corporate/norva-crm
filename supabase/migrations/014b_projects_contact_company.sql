@@ -1,11 +1,21 @@
 -- ============================================================
--- 014 — Direct contact + company link on projects
+-- 014b — Direct contact + company link on projects
 -- ============================================================
+-- Note historique : ce fichier portait à l'origine le numéro 014,
+-- en collision avec `014_custom_fields.sql`. Renommé en `014b` pour
+-- préserver l'ordre chronologique sans conflit visuel (l'ordre
+-- d'exécution Supabase suit le tri lexicographique : 014b vient bien
+-- juste après 014).
+--
+-- La migration a été appliquée en prod hors du tracker Supabase à
+-- l'époque (les colonnes/FK/index existent déjà). Comme elle est
+-- idempotente (add column if not exists + create index if not exists),
+-- une éventuelle réexécution sur un environnement frais reproduira
+-- exactement le même schéma sans casser la prod.
+--
 -- Adds optional contact_id / company_id FK columns on projects
 -- so a project can be linked directly to a contact and a company,
 -- independently of any deal it may be related to.
---
--- Idempotent : add column if not exists + create index if not exists.
 -- ============================================================
 
 alter table public.projects
