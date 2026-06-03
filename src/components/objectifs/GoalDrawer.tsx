@@ -4,13 +4,12 @@ import React, { useEffect, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -178,8 +177,11 @@ export function GoalDrawer({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent side="right" className="w-full sm:w-[520px]">
+    <ResponsiveDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      className="sm:w-[520px]"
+    >
         <DrawerHeader>
           <DrawerTitle>
             {goal ? "Modifier l'objectif" : "Nouvel objectif"}
@@ -240,7 +242,7 @@ export function GoalDrawer({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="metric">Métrique</Label>
                 <Select value={metric} onValueChange={(v) => setMetric(v as GoalMetric)}>
@@ -286,7 +288,7 @@ export function GoalDrawer({
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="periodStart">Début</Label>
                 <Input
@@ -327,7 +329,6 @@ export function GoalDrawer({
             </Button>
           </DrawerFooter>
         </form>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }

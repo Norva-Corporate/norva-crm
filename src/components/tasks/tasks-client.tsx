@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RowActions } from "@/components/ui/row-actions";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
 import { TaskDrawer } from "@/components/tasks/TaskDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteTask, updateTaskStatus } from "@/lib/actions/tasks";
@@ -243,7 +244,9 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
           <KPI label="Cette semaine" value={stats.dueThisWeek} accent="#F59E0B" />
         </div>
 
-        {/* Filters */}
+        {/* Filters — sur mobile : recherche pleine largeur + bouton "Filtres"
+            qui ouvre un bottom sheet avec view/status/project. Le bouton notifs
+            reste à part car il est contextuel (permission browser). */}
         <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -251,24 +254,90 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
               placeholder="Rechercher…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-xs"
+              size="touch"
+              className="pl-8"
             />
           </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {FILTER_OPTIONS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setView(f.key)}
-                className={cn(
-                  "text-xs px-2.5 py-1 transition-colors rounded-sm",
-                  view === f.key
-                    ? "bg-accent text-white"
-                    : "bg-[var(--muted)] text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
+
+          <MobileFilterSheet
+            title="Filtrer les tâches"
+            triggerLabel="Filtres"
+            activeCount={
+              (view !== "all" ? 1 : 0) +
+              (statusFilter !== "all" ? 1 : 0) +
+              (projectFilter !== "all" ? 1 : 0)
+            }
+          >
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono md:hidden">
+                Vue
+              </p>
+              <div className="flex gap-1.5 flex-wrap">
+                {FILTER_OPTIONS.map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setView(f.key)}
+                    className={cn(
+                      "text-xs px-2.5 py-1.5 md:py-1 transition-colors rounded-sm",
+                      view === f.key
+                        ? "bg-accent text-white"
+                        : "bg-[var(--muted)] text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono md:hidden">
+                Statut
+              </p>
+              <div className="flex gap-1.5 flex-wrap">
+                {STATUS_FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setStatusFilter(f.key)}
+                    className={cn(
+                      "text-xs px-2.5 py-1.5 md:py-1 transition-colors rounded-sm",
+                      statusFilter === f.key
+                        ? "bg-accent text-white"
+                        : "bg-[var(--muted)] text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {availableProjects.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono md:hidden">
+                  Projet
+                </p>
+                <select
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  className="h-10 md:h-7 px-2 text-sm md:text-xs bg-[var(--surface)] border border-[var(--border)] text-foreground focus:outline-none focus:border-accent/40"
+                >
+                  <option value="all">Tous les projets</option>
+                  <option value="none">Sans projet</option>
+                  {availableProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </MobileFilterSheet>
+
+          {/* Calendrier + notifs : actions secondaires, restent en ligne sur
+              desktop ; cachées sur mobile (le calendrier a son propre lien
+              en sidebar, et les notifs sont gérables depuis l'OS). */}
+          <div className="hidden md:flex items-center gap-1.5 flex-wrap">
             <Link
               href="/dashboard/calendrier"
               className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-[var(--muted)] text-muted-foreground hover:text-foreground transition-colors"
@@ -307,37 +376,6 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
               </span>
             )}
           </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setStatusFilter(f.key)}
-                className={cn(
-                  "text-xs px-2.5 py-1 transition-colors rounded-sm",
-                  statusFilter === f.key
-                    ? "bg-accent text-white"
-                    : "bg-[var(--muted)] text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          {availableProjects.length > 0 && (
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="h-7 px-2 text-xs bg-[var(--surface)] border border-[var(--border)] text-foreground focus:outline-none focus:border-accent/40"
-            >
-              <option value="all">Tous les projets</option>
-              <option value="none">Sans projet</option>
-              {availableProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
 
         {/* List */}

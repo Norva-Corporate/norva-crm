@@ -24,7 +24,7 @@ const DrawerOverlay = React.forwardRef<
 ));
 DrawerOverlay.displayName = "DrawerOverlay";
 
-type DrawerSide = "left" | "right";
+type DrawerSide = "left" | "right" | "bottom";
 
 interface DrawerContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
@@ -35,41 +35,55 @@ interface DrawerContentProps
 const DrawerContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DrawerContentProps
->(({ className, children, side = "right", showCloseButton = true, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed top-0 z-50 h-full w-full sm:w-[480px] bg-[var(--card)] shadow-card-hover flex flex-col",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out duration-200",
-        side === "right" && [
-          "right-0 border-l border-[var(--border)]",
-          "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
-        ],
-        side === "left" && [
-          "left-0 border-r border-[var(--border)]",
-          "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
-        ],
-        className
-      )}
-      {...props}
-    >
-      {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close
-          className={cn(
-            "absolute top-4 text-muted-foreground hover:text-foreground transition-colors focus:outline-none",
-            side === "right" ? "right-4" : "right-4"
-          )}
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Fermer</span>
-        </DialogPrimitive.Close>
-      )}
-    </DialogPrimitive.Content>
-  </DrawerPortal>
-));
+>(({ className, children, side = "right", showCloseButton = true, ...props }, ref) => {
+  const isBottom = side === "bottom";
+  return (
+    <DrawerPortal>
+      <DrawerOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed z-50 bg-[var(--card)] shadow-card-hover flex flex-col",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out duration-200",
+          !isBottom && "top-0 h-full w-full sm:w-[480px]",
+          side === "right" && [
+            "right-0 border-l border-[var(--border)]",
+            "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+          ],
+          side === "left" && [
+            "left-0 border-r border-[var(--border)]",
+            "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+          ],
+          isBottom && [
+            "bottom-0 left-0 right-0 w-full max-h-[92vh] rounded-t-xl border-t border-[var(--border)]",
+            "pb-[env(safe-area-inset-bottom)]",
+            "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          ],
+          className
+        )}
+        {...props}
+      >
+        {isBottom && (
+          <div className="flex-shrink-0 flex justify-center pt-2 pb-1">
+            <div
+              aria-hidden
+              className="h-1 w-10 rounded-full bg-[var(--border)]"
+            />
+          </div>
+        )}
+        {children}
+        {showCloseButton && !isBottom && (
+          <DialogPrimitive.Close
+            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fermer</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DrawerPortal>
+  );
+});
 DrawerContent.displayName = "DrawerContent";
 
 const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

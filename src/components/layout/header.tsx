@@ -36,7 +36,7 @@ export function Header({ title, action }: HeaderProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="md:hidden inline-flex items-center justify-center h-9 w-9 -ml-2 text-foreground hover:bg-white/5 rounded-sm transition-colors"
+        className="md:hidden inline-flex items-center justify-center h-11 w-11 -ml-2 text-foreground hover:bg-white/5 rounded-sm transition-colors"
         aria-label="Ouvrir le menu"
       >
         <Menu className="h-5 w-5" />
@@ -66,7 +66,7 @@ export function Header({ title, action }: HeaderProps) {
         <button
           type="button"
           onClick={openSearch}
-          className="md:hidden inline-flex items-center justify-center h-9 w-9 text-foreground hover:bg-white/5 rounded-sm transition-colors"
+          className="md:hidden inline-flex items-center justify-center h-11 w-11 text-foreground hover:bg-white/5 rounded-sm transition-colors"
           aria-label="Rechercher"
         >
           <Search className="h-4 w-4" />
@@ -78,7 +78,7 @@ export function Header({ title, action }: HeaderProps) {
           <Button
             size="sm"
             onClick={action.onClick}
-            className="h-8 text-xs gap-1.5 px-2 md:px-3"
+            className="h-11 md:h-8 text-sm md:text-xs gap-1.5 px-3 md:px-3"
           >
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{action.label}</span>

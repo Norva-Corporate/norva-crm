@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { MobileSidebarContext } from "@/components/layout/mobile-sidebar-context";
+import { useIsMobile } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types";
 
@@ -20,6 +21,7 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -80,7 +82,13 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
           {children}
         </main>
         <GlobalSearch />
-        <Toaster theme="dark" position="bottom-right" richColors />
+        {/* Sur mobile, top-center pour ne pas se faire masquer par le drawer
+            bottom des formulaires ou par le clavier virtuel. */}
+        <Toaster
+          theme="dark"
+          position={isMobile ? "top-center" : "bottom-right"}
+          richColors
+        />
       </div>
     </MobileSidebarContext.Provider>
   );

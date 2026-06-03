@@ -16,7 +16,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, ArrowRight } from "lucide-react";
+import { Plus, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { DealCard } from "./DealCard";
 import { LeadCard } from "@/components/leads/LeadCard";
@@ -394,57 +394,17 @@ export function PipelineKanban({
     dealsSnapshot.current = null;
   }
 
-  // Mode mobile : liste verticale groupée par colonne, pas de dnd
+  // Mode mobile : sélecteur de colonne (chips scrollables horizontalement)
+  // + UNE colonne affichée à la fois + swipe gauche/droite pour naviguer.
+  // Évite le scroll infini de la version précédente (toutes colonnes empilées).
   if (isMobile) {
     return (
-      <div className="space-y-4">
-        {columns.map((col) => {
-          const items = itemsByColumn[col.id] ?? [];
-          return (
-            <section key={col.id} className="space-y-2">
-              <header
-                className="px-3 py-2 bg-[#111927] border border-[var(--border)] flex items-center justify-between"
-                style={{ borderTop: `2px solid ${col.accent}` }}
-              >
-                <h3
-                  className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
-                  style={{ color: col.accent }}
-                >
-                  {col.label}
-                </h3>
-                <span className="text-[11px] text-muted-foreground tabular-nums">
-                  {items.length}
-                </span>
-              </header>
-              {items.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground/50 text-center py-3 italic">
-                  Vide
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {items.map((it) =>
-                    it.kind === "lead" ? (
-                      <LeadCard
-                        key={it.lead.id}
-                        lead={it.lead}
-                        onOpen={onOpenLead}
-                        mobile
-                      />
-                    ) : (
-                      <DealCard
-                        key={it.deal.id}
-                        deal={it.deal}
-                        onOpen={onOpenDeal}
-                        mobile
-                      />
-                    )
-                  )}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+      <MobilePipelineView
+        columns={columns}
+        itemsByColumn={itemsByColumn}
+        onOpenLead={onOpenLead}
+        onOpenDeal={onOpenDeal}
+      />
     );
   }
 
@@ -608,6 +568,199 @@ function ConversionSeparator() {
       </div>
       <ArrowRight className="h-4 w-4 text-accent" />
       <div className="mt-2 h-[60vh] w-px bg-[var(--border)]" />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * MOBILE VIEW
+ * Selector horizontal de colonnes (chips scrollables) + UNE colonne visible
+ * + swipe gauche/droite pour naviguer. Pas de DnD, les cards utilisent leur
+ * <select> de stage natif pour changer de colonne.
+ * ------------------------------------------------------------------------- */
+
+interface MobilePipelineViewProps {
+  columns: UnifiedColumn[];
+  itemsByColumn: Record<string, ActiveItem[]>;
+  onOpenLead: (lead: LeadWithDedup) => void;
+  onOpenDeal: (deal: DealWithRelations) => void;
+}
+
+const SWIPE_THRESHOLD = 50; // px de déplacement minimal pour valider un swipe
+
+function MobilePipelineView({
+  columns,
+  itemsByColumn,
+  onOpenLead,
+  onOpenDeal,
+}: MobilePipelineViewProps) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const activeChipRef = useRef<HTMLButtonElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  // Si le nombre de colonnes change (ex: showBrut toggle), recale l'index.
+  React.useEffect(() => {
+    if (activeIdx >= columns.length) {
+      setActiveIdx(Math.max(0, columns.length - 1));
+    }
+  }, [columns.length, activeIdx]);
+
+  // Auto-scroll du chip actif dans la barre horizontale (visibilité)
+  React.useEffect(() => {
+    const node = activeChipRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeIdx]);
+
+  const activeCol = columns[activeIdx];
+  const activeItems = activeCol ? itemsByColumn[activeCol.id] ?? [] : [];
+
+  function goPrev() {
+    setActiveIdx((i) => Math.max(0, i - 1));
+  }
+  function goNext() {
+    setActiveIdx((i) => Math.min(columns.length - 1, i + 1));
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    if (e.touches.length !== 1) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const endX = e.changedTouches[0]?.clientX ?? touchStartX.current;
+    const endY = e.changedTouches[0]?.clientY ?? touchStartY.current;
+    const dx = endX - touchStartX.current;
+    const dy = endY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    // Ignore les gestes verticaux dominants (scroll naturel de la liste)
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    if (dx < 0) goNext();
+    else goPrev();
+  }
+
+  if (!activeCol) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-12">
+        Aucune colonne à afficher.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Selector horizontal de colonnes */}
+      <div
+        ref={chipsRef}
+        className="-mx-4 px-4 overflow-x-auto scrollbar-hide"
+        style={{ scrollbarWidth: "none" }}
+      >
+        <div className="flex items-center gap-1.5 min-w-max">
+          {columns.map((col, idx) => {
+            const isActive = idx === activeIdx;
+            const count = itemsByColumn[col.id]?.length ?? 0;
+            return (
+              <button
+                key={col.id}
+                ref={isActive ? activeChipRef : undefined}
+                type="button"
+                onClick={() => setActiveIdx(idx)}
+                aria-pressed={isActive}
+                className={cn(
+                  "h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap transition-colors rounded-sm border",
+                  isActive
+                    ? "bg-[#111927] text-foreground"
+                    : "bg-transparent border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                style={
+                  isActive
+                    ? { borderColor: col.accent, color: col.accent }
+                    : undefined
+                }
+              >
+                <span className="font-mono uppercase tracking-wider text-[10px]">
+                  {col.label}
+                </span>
+                <span className="tabular-nums text-[10px] text-muted-foreground">
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Header de la colonne active (montre l'accent) */}
+      <header
+        className="px-3 py-2 bg-[#111927] border border-[var(--border)] flex items-center justify-between"
+        style={{ borderTop: `2px solid ${activeCol.accent}` }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={activeIdx === 0}
+            aria-label="Colonne précédente"
+            className="inline-flex h-8 w-8 -ml-1 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <h3
+            className="font-mono text-[11px] uppercase tracking-wider font-semibold truncate"
+            style={{ color: activeCol.accent }}
+          >
+            {activeCol.label}
+          </h3>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {activeItems.length}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={goNext}
+          disabled={activeIdx === columns.length - 1}
+          aria-label="Colonne suivante"
+          className="inline-flex h-8 w-8 -mr-1 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </header>
+
+      {/* Liste verticale des cards de la colonne active + swipe X */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="space-y-2 min-h-[40vh]"
+      >
+        {activeItems.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground/50 text-center py-6 italic">
+            Vide
+          </p>
+        ) : (
+          activeItems.map((it) =>
+            it.kind === "lead" ? (
+              <LeadCard
+                key={it.lead.id}
+                lead={it.lead}
+                onOpen={onOpenLead}
+                mobile
+              />
+            ) : (
+              <DealCard
+                key={it.deal.id}
+                deal={it.deal}
+                onOpen={onOpenDeal}
+                mobile
+              />
+            )
+          )
+        )}
+      </div>
     </div>
   );
 }

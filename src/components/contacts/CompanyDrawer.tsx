@@ -1,14 +1,13 @@
 "use client";
 import React, { useEffect, useState, useTransition } from "react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+  ResponsiveDrawerDescription as DrawerDescription,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,8 +130,7 @@ export function CompanyDrawer({
   const canSubmit = form.name.trim().length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DrawerContent>
+    <ResponsiveDrawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -158,7 +156,7 @@ export function CompanyDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Secteur</Label>
                   <Input
@@ -177,7 +175,7 @@ export function CompanyDrawer({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Taille</Label>
                   <Select
@@ -267,7 +265,6 @@ export function CompanyDrawer({
             </Button>
           </DrawerFooter>
         </form>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }

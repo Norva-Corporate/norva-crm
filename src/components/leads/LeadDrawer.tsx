@@ -3,12 +3,15 @@ import React, { useEffect, useState, useTransition } from "react";
 import {
   Drawer,
   DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
 } from "@/components/ui/drawer";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+  ResponsiveDrawerDescription as DrawerDescription,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -292,11 +295,10 @@ export function LeadDrawer({
   const statusBadge = STATUS_BADGE[lead.status];
 
   return (
-    <Drawer
+    <ResponsiveDrawer
       open={!!lead}
       onOpenChange={(o) => !pending && onOpenChange(o)}
     >
-      <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="flex items-center gap-2 pr-8">
             <Sparkles className="h-4 w-4 text-accent shrink-0" />
@@ -636,8 +638,7 @@ export function LeadDrawer({
             </Button>
           )}
         </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }
 

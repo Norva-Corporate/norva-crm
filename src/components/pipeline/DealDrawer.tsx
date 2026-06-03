@@ -1,14 +1,13 @@
 "use client";
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+  ResponsiveDrawerDescription as DrawerDescription,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -257,8 +256,11 @@ export function DealDrawer({
   const isLocked = pending || stagePending || deletePending;
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !isLocked && onOpenChange(o)}>
-      <DrawerContent className="sm:w-[520px]">
+    <ResponsiveDrawer
+      open={open}
+      onOpenChange={(o) => !isLocked && onOpenChange(o)}
+      className="sm:w-[520px]"
+    >
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -448,7 +450,7 @@ export function DealDrawer({
               </div>
 
               {/* Valeur + Probabilité */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Valeur (€)</Label>
                   <Input
@@ -476,7 +478,7 @@ export function DealDrawer({
               </div>
 
               {/* Stage + Closing date */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Étape</Label>
                   <Select
@@ -572,7 +574,7 @@ export function DealDrawer({
 
               {/* Raccourcis Won/Lost (édition uniquement) */}
               {isEdit && (
-                <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -633,7 +635,6 @@ export function DealDrawer({
             </Button>
           </DrawerFooter>
         </form>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }

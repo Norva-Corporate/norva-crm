@@ -1,14 +1,13 @@
 "use client";
 import React, { useEffect, useState, useTransition } from "react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+  ResponsiveDrawerDescription as DrawerDescription,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -169,8 +168,7 @@ export function ProjectDrawer({
   const canSubmit = form.name.trim().length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DrawerContent>
+    <ResponsiveDrawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -206,7 +204,7 @@ export function ProjectDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Statut</Label>
                   <Select
@@ -281,7 +279,7 @@ export function ProjectDrawer({
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Client</Label>
                   <Select
@@ -363,7 +361,7 @@ export function ProjectDrawer({
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Date de début</Label>
                   <Input
@@ -416,7 +414,6 @@ export function ProjectDrawer({
             </Button>
           </DrawerFooter>
         </form>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }

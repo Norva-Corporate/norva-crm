@@ -1,14 +1,13 @@
 "use client";
 import React, { useEffect, useState, useTransition } from "react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+  ResponsiveDrawerDescription as DrawerDescription,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,8 +132,7 @@ export function ContactDrawer({
     form.first_name.trim().length > 0 && form.last_name.trim().length > 0;
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DrawerContent>
+    <ResponsiveDrawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -149,7 +147,7 @@ export function ContactDrawer({
 
           <DrawerBody>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Prénom *</Label>
                   <Input
@@ -181,7 +179,7 @@ export function ContactDrawer({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Téléphone</Label>
                   <Input
@@ -260,7 +258,6 @@ export function ContactDrawer({
             </Button>
           </DrawerFooter>
         </form>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }

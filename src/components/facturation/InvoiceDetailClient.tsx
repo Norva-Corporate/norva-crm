@@ -230,7 +230,7 @@ export function InvoiceDetailClient({
             </div>
 
             {/* Dates */}
-            <div className="grid grid-cols-2 gap-6 text-xs border-y border-[#E5E7EB] py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs border-y border-[#E5E7EB] py-4">
               <div>
                 <p className="text-[10px] uppercase tracking-wide text-[#6B7280]">
                   Date d'émission

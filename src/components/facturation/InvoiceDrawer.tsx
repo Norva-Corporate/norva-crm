@@ -1,14 +1,13 @@
 "use client";
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerBody,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader as DrawerHeader,
+  ResponsiveDrawerBody as DrawerBody,
+  ResponsiveDrawerFooter as DrawerFooter,
+  ResponsiveDrawerTitle as DrawerTitle,
+  ResponsiveDrawerDescription as DrawerDescription,
+} from "@/components/ui/responsive-drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -223,8 +222,11 @@ export function InvoiceDrawer({
     !!form.issue_date;
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
-      <DrawerContent className="sm:w-[640px]">
+    <ResponsiveDrawer
+      open={open}
+      onOpenChange={(o) => !pending && onOpenChange(o)}
+      className="sm:w-[640px]"
+    >
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -239,7 +241,7 @@ export function InvoiceDrawer({
 
           <DrawerBody>
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Type</Label>
                   <Select
@@ -288,7 +290,7 @@ export function InvoiceDrawer({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Numéro</Label>
                   <Input
@@ -313,7 +315,7 @@ export function InvoiceDrawer({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Date d'échéance</Label>
                   <Input
@@ -347,7 +349,7 @@ export function InvoiceDrawer({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Contact</Label>
                   <Select
@@ -532,7 +534,6 @@ export function InvoiceDrawer({
             </Button>
           </DrawerFooter>
         </form>
-      </DrawerContent>
-    </Drawer>
+    </ResponsiveDrawer>
   );
 }

@@ -131,7 +131,9 @@ export function Sidebar({
               onClick={onNavigate}
               title={effectiveCollapsed ? item.label : undefined}
               className={cn(
-                "relative flex items-center h-9 text-sm transition-colors group",
+                "relative flex items-center text-sm transition-colors group",
+                // Variant mobile : items plus hauts pour confort tactile.
+                isMobile ? "h-11" : "h-9",
                 effectiveCollapsed ? "justify-center" : "gap-2.5 px-2.5",
                 isActive
                   ? "bg-accent/15 text-accent"
@@ -159,7 +161,8 @@ export function Sidebar({
           onClick={onNavigate}
           title={effectiveCollapsed ? "Profil" : undefined}
           className={cn(
-            "flex items-center h-9 text-sm transition-colors",
+            "flex items-center text-sm transition-colors",
+            isMobile ? "h-11" : "h-9",
             effectiveCollapsed ? "justify-center" : "gap-2.5 px-2.5",
             isProfilActive
               ? "bg-accent/15 text-accent"

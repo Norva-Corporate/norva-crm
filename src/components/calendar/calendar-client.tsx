@@ -189,8 +189,19 @@ export function CalendarClient({ year, month, events }: Props) {
           </div>
         </div>
 
-        {/* Calendar grid */}
-        <Card className="overflow-hidden">
+        {/* Vue agenda mobile : liste verticale des jours avec events.
+            Plus utilisable que la grille 6×7 qui demanderait pinch-to-zoom. */}
+        <div className="md:hidden">
+          <MobileAgendaView
+            year={year}
+            month={month}
+            eventsByDate={eventsByDate}
+            today={today}
+          />
+        </div>
+
+        {/* Calendar grid (desktop) */}
+        <Card className="hidden md:block overflow-hidden">
           <div className="overflow-x-auto">
           <div className="min-w-[640px]">
           <div className="grid grid-cols-7 border-b border-[var(--border)] bg-[var(--surface)]">
@@ -286,5 +297,110 @@ function Legend({ color, label }: { color: string; label: string }) {
       />
       {label}
     </span>
+  );
+}
+
+interface MobileAgendaViewProps {
+  year: number;
+  month: number;
+  eventsByDate: Map<string, CalendarEvent[]>;
+  today: string;
+}
+
+/** Vue agenda mobile : seuls les jours avec events sont affichés, dans l'ordre. */
+function MobileAgendaView({
+  year,
+  month,
+  eventsByDate,
+  today,
+}: MobileAgendaViewProps) {
+  const daysWithEvents = useMemo(() => {
+    const out: { iso: string; label: string; events: CalendarEvent[] }[] = [];
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= lastDay; d++) {
+      const iso = isoDate(year, month, d);
+      const ev = eventsByDate.get(iso);
+      if (!ev || ev.length === 0) continue;
+      const date = new Date(year, month, d);
+      const weekday = date.toLocaleDateString("fr-FR", { weekday: "short" });
+      out.push({
+        iso,
+        label: `${weekday} ${d}`,
+        events: ev,
+      });
+    }
+    return out;
+  }, [year, month, eventsByDate]);
+
+  if (daysWithEvents.length === 0) {
+    return (
+      <Card className="px-4 py-12 text-center text-sm text-muted-foreground">
+        Aucun événement ce mois-ci.
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {daysWithEvents.map((day) => {
+        const isToday = day.iso === today;
+        return (
+          <Card key={day.iso} className="overflow-hidden">
+            <div
+              className={cn(
+                "px-3 py-2 border-b border-[var(--border)] flex items-center gap-2 bg-[var(--surface)]",
+                isToday && "bg-accent/10"
+              )}
+            >
+              <span
+                className={cn(
+                  "text-xs font-mono uppercase tracking-wider font-semibold",
+                  isToday ? "text-accent" : "text-foreground"
+                )}
+              >
+                {day.label}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums ml-auto">
+                {day.events.length} évènement{day.events.length > 1 ? "s" : ""}
+              </span>
+              {isToday && (
+                <span className="text-[10px] text-accent uppercase tracking-wider font-semibold">
+                  Aujourd&apos;hui
+                </span>
+              )}
+            </div>
+            <ul className="divide-y divide-[var(--border)]">
+              {day.events.map((ev) => (
+                <li key={ev.id}>
+                  <Link
+                    href={ev.href}
+                    className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-[var(--muted)]/30 transition-colors"
+                  >
+                    <span
+                      className="h-8 w-1 shrink-0 rounded-full"
+                      style={{ backgroundColor: ev.color }}
+                      aria-hidden
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-sm font-medium truncate"
+                        style={{ color: ev.color }}
+                      >
+                        {ev.label}
+                      </p>
+                      {ev.meta && (
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {ev.meta}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        );
+      })}
+    </div>
   );
 }

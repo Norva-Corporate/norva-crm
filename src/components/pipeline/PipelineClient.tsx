@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, LayoutGrid, List, Search, Star } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-media-query";
 import { TO_CONTACT_OWNERS } from "@/lib/team";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { formatDate } from "@/lib/utils";
@@ -61,9 +62,13 @@ export function PipelineClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const isMobile = useIsMobile();
   const [deals, setDeals] = useState<DealWithRelations[]>(initialDeals);
   const [leads, setLeads] = useState<LeadWithDedup[]>(initialLeads);
   const [view, setView] = useState<ViewMode>("kanban");
+  // Sur mobile, on force la vue kanban (la ListView est cachée et le selector
+  // de colonne du Kanban mobile fait office de liste navigable).
+  const effectiveView: ViewMode = isMobile ? "kanban" : view;
   const [openLead, setOpenLead] = useState<LeadWithDedup | null>(null);
 
   // Recherche libre dans le kanban — filtre par nom/entreprise sur leads
@@ -334,7 +339,7 @@ export function PipelineClient({
           </div>
 
           {/* Recherche + filtres — uniquement en vue kanban. */}
-          {view === "kanban" && (
+          {effectiveView === "kanban" && (
             <>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -431,7 +436,7 @@ export function PipelineClient({
 
           {/* Toggle Bruts — uniquement en vue kanban, masque les leads
               en stage 'brut' pour alléger drastiquement le DOM. */}
-          {view === "kanban" && brutHydrated && brutCount > 0 && (
+          {effectiveView === "kanban" && brutHydrated && brutCount > 0 && (
             <button
               type="button"
               onClick={handleToggleBrut}
@@ -457,8 +462,10 @@ export function PipelineClient({
             </button>
           )}
 
-          {/* Switcher Kanban / Liste */}
-          <div className="inline-flex border border-[var(--border)] bg-[var(--surface)] p-0.5">
+          {/* Switcher Kanban / Liste — masqué sur mobile : la vue mobile du
+              kanban est déjà une liste navigable par colonne, la ListView
+              devient redondante et bouffe de l'espace toolbar. */}
+          <div className="hidden md:inline-flex border border-[var(--border)] bg-[var(--surface)] p-0.5">
             <ViewButton
               active={view === "kanban"}
               onClick={() => setView("kanban")}
@@ -476,7 +483,7 @@ export function PipelineClient({
 
         {/* Vue */}
         <div className="flex-1 min-h-0">
-          {view === "kanban" ? (
+          {effectiveView === "kanban" ? (
             <div className="h-full md:overflow-x-auto px-4 md:px-6 pb-6">
               <PipelineKanban
                 leads={leads}
