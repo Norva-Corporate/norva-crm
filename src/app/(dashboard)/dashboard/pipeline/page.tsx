@@ -1,7 +1,10 @@
 import React from "react";
 import { createClient } from "@/lib/supabase/server";
 import { PipelineClient } from "@/components/pipeline/PipelineClient";
+import { listLeads, listProfilesLight } from "@/lib/actions/leads";
 import type { DealWithRelations } from "@/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function PipelinePage() {
   const supabase = await createClient();
@@ -11,6 +14,8 @@ export default async function PipelinePage() {
     { data: contacts },
     { data: companies },
     { data: profiles },
+    leads,
+    leadProfiles,
   ] = await Promise.all([
     supabase
       .from("deals")
@@ -30,14 +35,18 @@ export default async function PipelinePage() {
       .from("profiles")
       .select("id, full_name")
       .order("full_name", { ascending: true }),
+    listLeads(),
+    listProfilesLight(),
   ]);
 
   return (
     <PipelineClient
       initialDeals={(deals ?? []) as unknown as DealWithRelations[]}
+      initialLeads={leads}
       contacts={contacts ?? []}
       companies={companies ?? []}
       profiles={profiles ?? []}
+      leadProfiles={leadProfiles}
     />
   );
 }

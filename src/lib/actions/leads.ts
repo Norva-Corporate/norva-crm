@@ -1,12 +1,13 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   getActivitiesForEntity,
 } from "@/lib/actions/activities";
-import { getFieldsWithValues } from "@/lib/actions/custom-fields";
 import { getTagsForEntity } from "@/lib/actions/tags";
+import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 
 export type ActionResult<T = null> =
   | { success: true; data: T }
@@ -96,11 +97,17 @@ export async function listLeads(): Promise<LeadWithDedup[]> {
     .select(
       "*, assignee:profiles!lead_imports_assigned_to_fkey(id, email, full_name, avatar_url)"
     )
+    // Filtre serveur : seuls les leads "actifs" (pending / qualified) sont
+    // pertinents pour le kanban. Les converted/dismissed/duplicate sont
+    // terminaux — les charger gonflait inutilement le DOM (jusqu'à 158 leads
+    // dismissed sur 499 total) ET autorisait des drags impossibles côté
+    // serveur (rejet avec error, rollback côté client → faux sentiment de
+    // latence).
+    .in("status", ["pending", "qualified"])
     // Tri par `stage_updated_at` DESC : les leads activement travaillés
     // remontent en premier (un lead bougé dans le kanban aujourd'hui passe
     // devant un lead importé plus tard mais jamais touché). Fallback sur
-    // `imported_at` pour les leads dont le stage n'a jamais bougé. Pas de
-    // limite : on charge tout (kanban + vue liste s'appuient là-dessus).
+    // `imported_at` pour les leads dont le stage n'a jamais bougé.
     .order("stage_updated_at", { ascending: false, nullsFirst: false })
     .order("imported_at", { ascending: false });
   if (!leads) return [];
@@ -229,19 +236,57 @@ export async function convertLead(
       .trim()
       .toLowerCase() || null;
 
+    // Sources externes extraites du raw_payload du lead — préservées
+    // sur la company créée (ou ajoutées à une company existante si elle
+    // n'avait pas encore ces champs). Voir migration 045.
+    const rawPayload =
+      (lead.raw_payload as Record<string, unknown> | null) ?? {};
+    const sirenFromLead =
+      typeof rawPayload.siren === "string" ? rawPayload.siren : null;
+    const placeIdFromLead =
+      typeof rawPayload.place_id === "string" ? rawPayload.place_id : null;
+    const gmapsUrlFromLead =
+      typeof rawPayload.google_maps_url === "string"
+        ? rawPayload.google_maps_url
+        : null;
+
     // Try match by domain first
     if (domain) {
       const { data: existing } = await supabase
         .from("companies")
-        .select("id")
+        .select("id, siren, place_id, google_maps_url")
         .eq("domain", domain)
         .maybeSingle();
-      if (existing) companyId = existing.id;
+      if (existing) {
+        companyId = existing.id;
+        // Enrichit la company existante avec les sources lead si elles
+        // sont absentes (on n'écrase JAMAIS une valeur déjà présente —
+        // potentiellement saisie manuellement par l'utilisateur).
+        const patch: Record<string, string> = {};
+        if (!existing.siren && sirenFromLead) patch.siren = sirenFromLead;
+        if (!existing.place_id && placeIdFromLead)
+          patch.place_id = placeIdFromLead;
+        if (!existing.google_maps_url && gmapsUrlFromLead)
+          patch.google_maps_url = gmapsUrlFromLead;
+        if (Object.keys(patch).length > 0) {
+          await supabase
+            .from("companies")
+            .update(patch)
+            .eq("id", existing.id);
+        }
+      }
     }
     if (!companyId && name) {
       const { data: created, error: cErr } = await supabase
         .from("companies")
-        .insert({ name, domain, created_by: user.id })
+        .insert({
+          name,
+          domain,
+          siren: sirenFromLead,
+          place_id: placeIdFromLead,
+          google_maps_url: gmapsUrlFromLead,
+          created_by: user.id,
+        })
         .select("id")
         .single();
       if (cErr || !created) {
@@ -286,7 +331,7 @@ export async function convertLead(
     })
     .eq("id", leadId);
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/contacts");
   if (companyId) revalidatePath("/dashboard/companies");
 
@@ -318,7 +363,7 @@ export async function markLeadAsDuplicate(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -339,7 +384,7 @@ export async function dismissLead(leadId: string): Promise<ActionResult> {
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -354,7 +399,7 @@ export async function reopenLead(leadId: string): Promise<ActionResult> {
     })
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -442,7 +487,25 @@ export async function updateLead(
       error: error?.message ?? "Mise à jour impossible.",
     };
   }
-  revalidatePath("/dashboard/leads");
+
+  // Si la date de relance a été modifiée, recréer / annuler la tâche
+  // auto + sync GCal. On le fait en `after()` pour que la server action
+  // rende la main au client dès que le lead est sauvé (le drawer peut
+  // ainsi refléter la nouvelle valeur instantanément, sans attendre
+  // les 3 DB roundtrips + sync GCal qui prennent ~500ms-1s).
+  if ("next_follow_up_at" in cleaned) {
+    const fullLead = data as LeadImport & {
+      pipeline_stage: LeadPipelineStage;
+    };
+    const uid = user.id;
+    after(async () => {
+      const sb = await createClient();
+      await ensureLeadFollowUpTask(sb, fullLead, uid);
+      revalidatePath("/dashboard/taches");
+    });
+  }
+
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: data as LeadImport };
 }
 
@@ -476,66 +539,56 @@ function stageToStatus(stage: LeadPipelineStage): "pending" | "qualified" {
 // Tâches auto liées au stage (020)
 // ============================================================
 //
-// Quand un lead change de stage, on crée auto une tâche pour ne rien
-// oublier. Avant de créer, on annule la tâche pending précédente
-// auto-créée pour ce lead (dédup via `tasks.auto_origin`).
+// Quand un lead change de stage, on crée une tâche de relance auto
+// UNIQUEMENT si :
+//   - le stage est `contacted` ou `stand_by` (vraies relances ; `to_contact` /
+//     `to_email` / `in_discussion` = premier contact ou prépa deal, hors scope),
+//   - ET le lead a une date de relance posée dans `next_follow_up_at`.
+// La due_date de la tâche est exactement `next_follow_up_at` (champ rempli
+// manuellement depuis le LeadDrawer). Aucune date posée → aucune tâche créée.
+// La dédup via `tasks.auto_origin` reste active.
 
 type StageTaskTemplate = {
   title: (fullName: string) => string;
   description: string;
   priority: "normal" | "high" | "urgent";
-  /** Days from now */
-  due_in: number;
 };
 
 const STAGE_TASK_TEMPLATES: Partial<
   Record<LeadPipelineStage, StageTaskTemplate>
 > = {
-  to_contact: {
-    title: (name) => `Appeler ${name}`,
-    description: "Premier contact — utilise le kit ✉️ généré si dispo.",
-    priority: "high",
-    due_in: 1,
-  },
-  to_email: {
-    title: (name) => `Envoyer un email à ${name}`,
-    description: "Cold email à envoyer — utilise le kit ✉️ si dispo.",
-    priority: "high",
-    due_in: 2,
-  },
   contacted: {
     title: (name) => `Relancer ${name}`,
     description: "Vérifier la réponse au cold outreach.",
     priority: "normal",
-    due_in: 5,
-  },
-  in_discussion: {
-    title: (name) => `Préparer proposition pour ${name}`,
-    description: "Le prospect a répondu — prépare l'offre.",
-    priority: "high",
-    due_in: 3,
   },
   stand_by: {
     title: (name) => `Recontacter ${name}`,
-    description: "Lead parké — relance prévue après ~1 mois de pause.",
+    description: "Lead parké — relance prévue.",
     priority: "normal",
-    due_in: 30,
   },
 };
 
-function addDays(date: Date, days: number): string {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
 /**
- * Crée la tâche auto liée à un nouveau stage. Annule la précédente
- * tâche auto pending pour ce lead (dédup propre).
- * Non bloquant : si la création échoue, le drag du lead aboutit quand
- * même (log côté serveur).
+ * Crée / met à jour la tâche de relance liée à un lead, avec dédup
+ * propre via `tasks.auto_origin`. Triggers :
+ *   1. Changement de stage du lead (drag dans le kanban) — appelé
+ *      par updateLeadStage / updateLeadStageAndAssignee.
+ *   2. Modification de `next_follow_up_at` depuis le drawer —
+ *      appelé par updateLead.
+ *
+ * Comportement :
+ *   - Si pas de template pour le stage actuel OU pas de date posée
+ *     → annule la tâche auto précédente (si elle existait), pas de
+ *     nouvelle tâche créée.
+ *   - Sinon → annule l'ancienne, crée la nouvelle avec
+ *     `due_date = next_follow_up_at`, et synchronise vers Google
+ *     Calendar (best-effort).
+ *
+ * Non bloquant : si la création/sync échoue, l'opération principale
+ * (update du lead) aboutit quand même (log serveur).
  */
-async function createStageTask(
+async function ensureLeadFollowUpTask(
   supabase: Awaited<ReturnType<typeof createClient>>,
   lead: {
     id: string;
@@ -543,44 +596,77 @@ async function createStageTask(
     last_name: string | null;
     company_name: string | null;
     assigned_to: string | null;
+    next_follow_up_at: string | null;
+    pipeline_stage: LeadPipelineStage;
   },
-  stage: LeadPipelineStage,
   userId: string
 ): Promise<void> {
-  const template = STAGE_TASK_TEMPLATES[stage];
-  if (!template) return; // brut / verified : pas de tâche
+  const template = STAGE_TASK_TEMPLATES[lead.pipeline_stage];
+  const shouldHaveTask = !!template && !!lead.next_follow_up_at;
 
-  // 1) Annule les tâches auto pending précédentes pour ce lead
-  await supabase
+  // 1) Récupère les IDs des tâches auto pending précédentes pour ce lead.
+  //    On les sync vers GCal AVANT de DELETE pour que loadTaskEvent puisse
+  //    encore les lire (status='pending') et déclencher la suppression de
+  //    l'event côté Google. Une fois la sync lancée (fire-and-forget), on
+  //    DELETE les rows — pas besoin de garder une trace 'cancelled' dans
+  //    /dashboard/taches.
+  const { data: toDelete } = await supabase
     .from("tasks")
-    .update({ status: "cancelled" })
+    .select("id")
     .eq("related_type", "lead_import")
     .eq("related_id", lead.id)
     .like("auto_origin", "lead_stage:%")
     .eq("status", "pending");
 
-  // 2) Crée la nouvelle tâche
+  const idsToDelete = (toDelete ?? []).map((t) => t.id);
+  if (idsToDelete.length > 0) {
+    // Sync GCal d'abord (lit la row avant suppression)
+    for (const id of idsToDelete) {
+      void syncEntityToAllConnectedUsers("task", id).catch((e) =>
+        console.error("[ensureLeadFollowUpTask] sync delete:", e)
+      );
+    }
+    // Puis DELETE — laisse un instant à la sync pour lire la row.
+    // En pratique syncEntityToAllConnectedUsers commence par lire le
+    // mapping calendar_event_links (qui sait quel event Google supprimer),
+    // donc on peut DELETE la task tout de suite.
+    await supabase.from("tasks").delete().in("id", idsToDelete);
+  }
+
+  if (!shouldHaveTask) return; // pas de date posée ou stage hors scope
+
+  // 2) Crée la nouvelle tâche avec la date posée par l'utilisateur
   const fullName =
     [lead.first_name, lead.last_name].filter(Boolean).join(" ") ||
     lead.company_name ||
     "ce prospect";
 
-  const { error } = await supabase.from("tasks").insert({
-    title: template.title(fullName),
-    description: template.description,
-    status: "pending",
-    priority: template.priority,
-    due_date: addDays(new Date(), template.due_in),
-    related_type: "lead_import",
-    related_id: lead.id,
-    assigned_to: lead.assigned_to ?? userId,
-    auto_origin: `lead_stage:${stage}`,
-    created_by: userId,
-  });
+  const { data: inserted, error } = await supabase
+    .from("tasks")
+    .insert({
+      title: template.title(fullName),
+      description: template.description,
+      status: "pending",
+      priority: template.priority,
+      due_date: lead.next_follow_up_at!.slice(0, 10), // timestamptz → YYYY-MM-DD
+      related_type: "lead_import",
+      related_id: lead.id,
+      assigned_to: lead.assigned_to ?? userId,
+      auto_origin: `lead_stage:${lead.pipeline_stage}`,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("[createStageTask] failed:", error.message);
+  if (error || !inserted) {
+    console.error("[ensureLeadFollowUpTask] insert:", error?.message);
+    return;
   }
+
+  // 3) Push vers Google Calendar (best-effort, async)
+  void syncEntityToAllConnectedUsers("task", inserted.id).catch((e) =>
+    console.error("[ensureLeadFollowUpTask] sync insert:", e)
+  );
 }
 
 /**
@@ -607,7 +693,7 @@ export async function updateLeadStage(
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage")
+    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage, next_follow_up_at")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -625,13 +711,20 @@ export async function updateLeadStage(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Crée la tâche auto liée au nouveau stage (si applicable)
+  // Tâche de relance déférée via after() — le drag handler côté client
+  // attend uniquement le UPDATE du lead (~50ms), pas les 3+ DB roundtrips
+  // de ensureLeadFollowUpTask. Sans cela, le drag perd 500ms-1s.
   if (lead.pipeline_stage !== stage) {
-    await createStageTask(supabase, lead, stage, user.id);
+    const fullLead = { ...lead, pipeline_stage: stage };
+    const uid = user.id;
+    after(async () => {
+      const sb = await createClient();
+      await ensureLeadFollowUpTask(sb, fullLead, uid);
+      revalidatePath("/dashboard/taches");
+    });
   }
 
-  revalidatePath("/dashboard/leads");
-  revalidatePath("/dashboard/taches");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -662,7 +755,7 @@ export async function updateLeadStageAndAssignee(
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage")
+    .select("id, status, first_name, last_name, company_name, assigned_to, pipeline_stage, next_follow_up_at")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -684,18 +777,23 @@ export async function updateLeadStageAndAssignee(
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Crée la tâche auto liée au nouveau stage (avec le nouvel assignee)
+  // Tâche de relance déférée via after() — même raison que updateLeadStage :
+  // ne pas bloquer le drag handler sur des opérations non-critiques.
   if (lead.pipeline_stage !== stage) {
-    await createStageTask(
-      supabase,
-      { ...lead, assigned_to: assignedTo },
-      stage,
-      user.id
-    );
+    const fullLead = {
+      ...lead,
+      assigned_to: assignedTo,
+      pipeline_stage: stage,
+    };
+    const uid = user.id;
+    after(async () => {
+      const sb = await createClient();
+      await ensureLeadFollowUpTask(sb, fullLead, uid);
+      revalidatePath("/dashboard/taches");
+    });
   }
 
-  revalidatePath("/dashboard/leads");
-  revalidatePath("/dashboard/taches");
+  revalidatePath("/dashboard/pipeline");
   return { success: true, data: null };
 }
 
@@ -716,7 +814,7 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
 
   const { data: lead } = await supabase
     .from("lead_imports")
-    .select("id, status, pipeline_stage, first_name, last_name, company_name, assigned_to")
+    .select("id, status, pipeline_stage")
     .eq("id", leadId)
     .single();
   if (!lead) return { success: false, error: "Lead introuvable." };
@@ -742,12 +840,11 @@ export async function qualifyLead(leadId: string): Promise<ActionResult> {
     .eq("id", leadId);
   if (error) return { success: false, error: error.message };
 
-  // Si on a basculé en 'to_contact', créer la tâche auto associée
-  if (stageChanged) {
-    await createStageTask(supabase, lead, "to_contact", user.id);
-  }
+  // `to_contact` n'a pas de template de relance auto — qualifier un lead
+  // ne crée donc aucune tâche. L'utilisateur peut poser une date de relance
+  // dans le drawer puis drag vers `contacted` / `stand_by` pour la générer.
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/taches");
   return { success: true, data: null };
 }
@@ -767,6 +864,7 @@ export async function convertLeadToDeal(
   overrides?: {
     deal_title?: string;
     deal_value?: number | null;
+    deal_stage?: import("@/types").DealStage;
     company_id?: string | null;
     company_name?: string;
     company_domain?: string;
@@ -815,7 +913,7 @@ export async function convertLeadToDeal(
     .from("deals")
     .insert({
       title: dealTitle,
-      stage: "discussion",
+      stage: overrides?.deal_stage ?? "discussion",
       contact_id,
       company_id,
       value: dealValue,
@@ -833,7 +931,7 @@ export async function convertLeadToDeal(
     };
   }
 
-  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/contacts");
 
@@ -867,13 +965,12 @@ export async function getLeadAssociatedDeal(
  * et le deal associé si le lead a été converti.
  */
 export async function getLeadDetails(leadId: string) {
-  const [activities, customFields, tags, associatedDeal] = await Promise.all([
+  const [activities, tags, associatedDeal] = await Promise.all([
     getActivitiesForEntity("lead_import", leadId),
-    getFieldsWithValues("lead_import", leadId),
     getTagsForEntity("lead_import", leadId),
     getLeadAssociatedDeal(leadId),
   ]);
-  return { activities, customFields, tags, associatedDeal };
+  return { activities, tags, associatedDeal };
 }
 
 /**
@@ -886,4 +983,77 @@ export async function listProfilesLight(): Promise<LeadAssignee[]> {
     .select("id, email, full_name, avatar_url")
     .order("full_name", { ascending: true });
   return (data ?? []) as LeadAssignee[];
+}
+
+// ============================================================
+// Batch actions (bulk select kanban)
+// ============================================================
+// Wrappers naïfs autour des actions unitaires. `Promise.all` lance tout
+// en parallèle, on collecte les erreurs et on retourne un récap. Pas de
+// transaction (Supabase RPC + n queries chacun), mais ces actions sont
+// déjà idempotentes individuellement : un échec partiel laisse la DB
+// dans un état cohérent (les leads traités sont bien à jour).
+
+export interface BatchResult {
+  ok: number;
+  failed: number;
+  errors: string[];
+}
+
+async function runBatch<T>(
+  ids: string[],
+  fn: (id: string) => Promise<ActionResult<T>>
+): Promise<BatchResult> {
+  if (ids.length === 0) return { ok: 0, failed: 0, errors: [] };
+  const results = await Promise.all(ids.map(fn));
+  let ok = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  for (const r of results) {
+    if (r.success) ok++;
+    else {
+      failed++;
+      if (r.error) errors.push(r.error);
+    }
+  }
+  return { ok, failed, errors };
+}
+
+export async function dismissLeadsBatch(ids: string[]): Promise<BatchResult> {
+  return runBatch(ids, dismissLead);
+}
+
+export async function qualifyLeadsBatch(ids: string[]): Promise<BatchResult> {
+  // qualifyLead vérifie déjà `status='pending'` ; les leads déjà
+  // qualifiés échouent silencieusement (errors.length augmente).
+  return runBatch(ids, qualifyLead);
+}
+
+export async function assignLeadsBatch(
+  ids: string[],
+  assigneeId: string | null
+): Promise<BatchResult> {
+  if (ids.length === 0) return { ok: 0, failed: 0, errors: [] };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("lead_imports")
+    .update({ assigned_to: assigneeId })
+    .in("id", ids);
+  if (error) {
+    return { ok: 0, failed: ids.length, errors: [error.message] };
+  }
+  revalidatePath("/dashboard/pipeline");
+  return { ok: ids.length, failed: 0, errors: [] };
+}
+
+export async function convertLeadsToDealsBatch(
+  ids: string[],
+  dealStage?: import("@/types").DealStage
+): Promise<BatchResult> {
+  // convertLeadToDeal accepte un objet overrides ({ deal_stage, ... }).
+  // Pas de transaction : si la conversion 3/5 plante, les 2 premiers
+  // deals existent quand même (utile : on ne perd pas le travail).
+  return runBatch(ids, (id) =>
+    convertLeadToDeal(id, dealStage ? { deal_stage: dealStage } : undefined)
+  );
 }

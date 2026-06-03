@@ -1,62 +1,51 @@
 "use client";
-import React, { useMemo, useState, useTransition } from "react";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Search,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
   CheckCircle2,
   Circle,
   Clock,
   AlertCircle,
   Flame,
+  CalendarDays,
+  Bell,
+  BellOff,
 } from "lucide-react";
+import { useBrowserNotifications } from "@/hooks/use-browser-notifications";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { RowActions } from "@/components/ui/row-actions";
 import { TaskDrawer } from "@/components/tasks/TaskDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteTask, updateTaskStatus } from "@/lib/actions/tasks";
 import { getProjectColor } from "@/lib/project-color";
 import { formatDate, cn } from "@/lib/utils";
-import type { Task, TaskPriority, TaskStatus } from "@/types";
+import { taskStatuses, taskPriorities } from "@/lib/statuses";
+import type { Task, TaskStatus } from "@/types";
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  pending: "À faire",
-  in_progress: "En cours",
-  done: "Terminée",
-  cancelled: "Annulée",
+  pending: taskStatuses.pending.label,
+  in_progress: taskStatuses.in_progress.label,
+  done: taskStatuses.done.label,
+  cancelled: taskStatuses.cancelled.label,
 };
 
 const STATUS_VARIANT: Record<
   TaskStatus,
   React.ComponentProps<typeof Badge>["variant"]
 > = {
-  pending: "secondary",
-  in_progress: "default",
-  done: "success",
-  cancelled: "outline",
+  pending: taskStatuses.pending.variant,
+  in_progress: taskStatuses.in_progress.variant,
+  done: taskStatuses.done.variant,
+  cancelled: taskStatuses.cancelled.variant,
 };
 
-const PRIORITY_META: Record<
-  TaskPriority,
-  { label: string; color: string }
-> = {
-  low: { label: "Basse", color: "text-muted-foreground" },
-  normal: { label: "Normale", color: "text-foreground" },
-  high: { label: "Haute", color: "text-[#FB923C]" },
-  urgent: { label: "Urgente", color: "text-destructive" },
-};
+const PRIORITY_META = taskPriorities;
 
 const FILTER_OPTIONS: { key: "all" | "mine" | "overdue" | "this_week"; label: string }[] = [
   { key: "all", label: "Toutes" },
@@ -110,6 +99,37 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
 
   const today = startOfTodayISO();
   const weekEnd = endOfWeekISO();
+
+  // Notification browser pour tâches dues aujourd'hui (une notif/jour max,
+  // n'apparait que si l'app n'est pas focus — comportement du hook).
+  const { permission, requestPermission, notify } = useBrowserNotifications();
+  const dueTodayPendingCount = useMemo(
+    () =>
+      initialTasks.filter(
+        (t) =>
+          t.due_date === today &&
+          (t.status === "pending" || t.status === "in_progress")
+      ).length,
+    [initialTasks, today]
+  );
+  useEffect(() => {
+    if (permission !== "granted" || dueTodayPendingCount === 0) return;
+    if (typeof window === "undefined") return;
+    const lastKey = "norva.tasks.lastNotifyDate";
+    if (window.localStorage.getItem(lastKey) === today) return;
+    notify(
+      `${dueTodayPendingCount} tâche${
+        dueTodayPendingCount > 1 ? "s" : ""
+      } due${dueTodayPendingCount > 1 ? "s" : ""} aujourd'hui`,
+      {
+        body: "Ouvre Norva CRM pour les traiter.",
+        onClick: () => {
+          window.location.href = "/dashboard/taches";
+        },
+      }
+    );
+    window.localStorage.setItem(lastKey, today);
+  }, [permission, dueTodayPendingCount, notify, today]);
 
   // Liste des projets visibles parmi les tâches (pour le dropdown filtre)
   const availableProjects = useMemo(() => {
@@ -249,6 +269,43 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
                 {f.label}
               </button>
             ))}
+            <Link
+              href="/dashboard/calendrier"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-[var(--muted)] text-muted-foreground hover:text-foreground transition-colors"
+              title="Voir les tâches (et autres échéances) dans le calendrier"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Calendrier
+            </Link>
+            {permission === "default" && (
+              <button
+                type="button"
+                onClick={requestPermission}
+                title="Activer les notifications navigateur pour les tâches dues aujourd'hui"
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-[var(--muted)] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Activer notifs
+              </button>
+            )}
+            {permission === "granted" && (
+              <span
+                title="Notifications activées — une alerte par jour si tâches dues"
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-success/15 text-success"
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Notifs ON
+              </span>
+            )}
+            {permission === "denied" && (
+              <span
+                title="Notifications bloquées par le navigateur — autorise-les dans les paramètres du site"
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-sm bg-destructive/15 text-destructive"
+              >
+                <BellOff className="h-3.5 w-3.5" />
+                Notifs bloquées
+              </span>
+            )}
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {STATUS_FILTERS.map((f) => (
@@ -428,26 +485,10 @@ export function TasksClient({ initialTasks, members, currentUserId }: Props) {
                       </div>
                     </div>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(t)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDeleting(t)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActions
+                      onEdit={() => openEdit(t)}
+                      onDelete={() => setDeleting(t)}
+                    />
                   </li>
                 );
               })}

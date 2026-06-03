@@ -24,6 +24,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ApplyTemplateButton } from "@/components/task-templates/ApplyTemplateButton";
 import { ProjectDrawer } from "@/components/projets/ProjectDrawer";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
 import { TaskDrawer } from "@/components/tasks/TaskDrawer";
@@ -31,7 +32,6 @@ import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { InlineText } from "@/components/ui/inline-text";
 import { InlinePicker } from "@/components/ui/inline-picker";
-import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import { patchProject, type ProjectPatch } from "@/lib/actions/projects";
 import {
   updateTaskStatus,
@@ -41,7 +41,6 @@ import { getProjectColor } from "@/lib/project-color";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type {
   Activity,
-  CustomFieldWithValue,
   Project,
   ProjectStatus,
   InvoiceStatus,
@@ -52,27 +51,16 @@ import type {
   TaskStatus,
 } from "@/types";
 
-const STATUS_CONFIG: Record<
-  ProjectStatus,
-  {
-    label: string;
-    variant: "default" | "secondary" | "success" | "warning" | "destructive";
-    color: string;
-  }
-> = {
-  en_attente: { label: "En attente", variant: "secondary", color: "#8A99B8" },
-  en_cours: { label: "En cours", variant: "default", color: "#3B7BF5" },
-  en_pause: { label: "En pause", variant: "warning", color: "#F59E0B" },
-  termine: { label: "Terminé", variant: "success", color: "#22C55E" },
-  annule: { label: "Annulé", variant: "destructive", color: "#EF4444" },
-};
+import { projectStatuses, invoiceStatuses } from "@/lib/statuses";
+
+const STATUS_CONFIG = projectStatuses;
 
 const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
-  brouillon: "Brouillon",
-  envoyee: "Envoyée",
-  payee: "Payée",
-  en_retard: "En retard",
-  annulee: "Annulée",
+  brouillon: invoiceStatuses.brouillon.label,
+  envoyee: invoiceStatuses.envoyee.label,
+  payee: invoiceStatuses.payee.label,
+  en_retard: invoiceStatuses.en_retard.label,
+  annulee: invoiceStatuses.annulee.label,
 };
 
 interface InvoiceLite {
@@ -120,7 +108,6 @@ interface Props {
     } | null;
   })[];
   tags?: Tag[];
-  customFields?: CustomFieldWithValue[];
   tasks?: ProjectTaskRow[];
 }
 
@@ -133,7 +120,6 @@ export function ProjectDetailClient({
   companies,
   activities = [],
   tags = [],
-  customFields = [],
   tasks = [],
 }: Props) {
   const router = useRouter();
@@ -556,10 +542,16 @@ export function ProjectDetailClient({
               <ListChecks className="h-3 w-3" />
               Tâches du projet ({tasks.filter((t) => t.status !== "cancelled").length})
             </h2>
-            <Button size="sm" variant="outline" onClick={openTaskCreate}>
-              <Plus className="h-3.5 w-3.5" />
-              Nouvelle tâche
-            </Button>
+            <div className="flex items-center gap-2">
+              <ApplyTemplateButton
+                scope="project"
+                relatedId={project.id}
+              />
+              <Button size="sm" variant="outline" onClick={openTaskCreate}>
+                <Plus className="h-3.5 w-3.5" />
+                Nouvelle tâche
+              </Button>
+            </div>
           </div>
 
           {tasks.filter((t) => t.status !== "cancelled").length === 0 ? (
@@ -681,12 +673,6 @@ export function ProjectDetailClient({
             </>
           )}
         </Card>
-
-        <CustomFieldsPanel
-          entityType="project"
-          entityId={project.id}
-          initialFields={customFields}
-        />
 
         {/* Activity timeline */}
         <ActivityTimeline

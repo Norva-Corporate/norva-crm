@@ -28,6 +28,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { createActivity, deleteActivity } from "@/lib/actions/activities";
 import { formatRelativeDate, cn } from "@/lib/utils";
+import { invoiceStatuses, projectStatuses } from "@/lib/statuses";
 import type { Activity, ActivityEntityType } from "@/types";
 
 const MANUAL_TYPES = ["note", "call", "meeting", "email"] as const;
@@ -60,19 +61,19 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const PROJECT_STATUS_LABELS: Record<string, string> = {
-  en_attente: "En attente",
-  en_cours: "En cours",
-  en_pause: "En pause",
-  termine: "Terminé",
-  annule: "Annulé",
+  en_attente: projectStatuses.en_attente.label,
+  en_cours: projectStatuses.en_cours.label,
+  en_pause: projectStatuses.en_pause.label,
+  termine: projectStatuses.termine.label,
+  annule: projectStatuses.annule.label,
 };
 
 const INVOICE_STATUS_LABELS: Record<string, string> = {
-  brouillon: "Brouillon",
-  envoyee: "Envoyée",
-  payee: "Payée",
-  en_retard: "En retard",
-  annulee: "Annulée",
+  brouillon: invoiceStatuses.brouillon.label,
+  envoyee: invoiceStatuses.envoyee.label,
+  payee: invoiceStatuses.payee.label,
+  en_retard: invoiceStatuses.en_retard.label,
+  annulee: invoiceStatuses.annulee.label,
 };
 
 type ActivityRow = Activity & {
@@ -85,7 +86,7 @@ interface Props {
   initialActivities: ActivityRow[];
 }
 
-export function ActivityTimeline({
+function ActivityTimelineImpl({
   entityType,
   entityId,
   initialActivities,
@@ -187,6 +188,10 @@ export function ActivityTimeline({
     </Card>
   );
 }
+
+// React.memo : évite les rerenders du timeline (souvent lourd, beaucoup
+// d'activités) quand le drawer parent re-rend pour un autre champ.
+export const ActivityTimeline = React.memo(ActivityTimelineImpl);
 
 function ActivityItem({ activity }: { activity: ActivityRow }) {
   const router = useRouter();

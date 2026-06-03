@@ -25,7 +25,6 @@ import { InlineText } from "@/components/ui/inline-text";
 import { InlinePicker } from "@/components/ui/inline-picker";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
-import { CustomFieldsPanel } from "@/components/custom-fields/custom-fields-panel";
 import Link from "next/link";
 import {
   Loader2,
@@ -36,12 +35,6 @@ import {
   Loader,
   Trophy,
   ArrowRight,
-  MapPin,
-  Building2,
-  FileText,
-  Briefcase,
-  Globe,
-  BookText,
   ExternalLink as ExternalLinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -55,8 +48,9 @@ import {
   type LeadUpdatePatch,
   type LeadWithDedup,
 } from "@/lib/actions/leads";
-import type { Activity, CustomFieldWithValue, Tag } from "@/types";
+import type { Activity, Tag } from "@/types";
 import { cn } from "@/lib/utils";
+import { buildExternalLinks } from "@/lib/external-links";
 
 const NEW_COMPANY = "__new__";
 const NO_COMPANY = "__none__";
@@ -84,14 +78,22 @@ interface Props {
   profiles: LeadAssignee[];
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** Callback appelé après dismiss/qualify/convert depuis le drawer pour
+   *  que le parent (PipelineClient) puisse filtrer/maj son state local
+   *  sans attendre router.refresh() (qui ne ré-hydrate pas useState). */
+  onLeadChanged?: (
+    leadId: string,
+    change: { dismissed?: true; converted?: true; qualified?: true }
+  ) => void;
 }
 
 export function LeadDrawer({
-  lead,
+  lead: leadProp,
   companies,
   profiles,
   onOpenChange,
   onSuccess,
+  onLeadChanged,
 }: Props) {
   const [convertMode, setConvertMode] = useState(false);
   const [companyChoice, setCompanyChoice] = useState<string>(NO_COMPANY);
@@ -100,10 +102,14 @@ export function LeadDrawer({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // État local du lead — mirror du prop, mis à jour aussi après chaque save
+  // inline (saveText, saveDateField, saveBudget, saveScore) pour que l'UI
+  // reflète le nouveau état sans attendre un re-fetch du parent. Sans ça,
+  // useInlineOptimistic reset à la propValue (= ancienne valeur) après la
+  // transition → user pense que la sauvegarde a échoué.
+  const [lead, setLead] = useState<LeadWithDedup | null>(leadProp);
+
   const [activities, setActivities] = useState<Activity[] | null>(null);
-  const [customFields, setCustomFields] = useState<
-    CustomFieldWithValue[] | null
-  >(null);
   const [tags, setTags] = useState<Tag[] | null>(null);
   const [associatedDeal, setAssociatedDeal] = useState<{
     id: string;
@@ -111,39 +117,49 @@ export function LeadDrawer({
     stage: string;
   } | null>(null);
 
+  // Sync lead state avec le prop quand on ouvre un autre lead.
   useEffect(() => {
-    if (!lead) return;
+    setLead(leadProp);
+  }, [leadProp]);
+
+  useEffect(() => {
+    if (!leadProp) return;
     setConvertMode(false);
     setError(null);
-    if (lead.existing_company_id) {
-      setCompanyChoice(lead.existing_company_id);
+    if (leadProp.existing_company_id) {
+      setCompanyChoice(leadProp.existing_company_id);
       setCompanyName("");
       setCompanyDomain("");
-    } else if (lead.company_name || lead.company_domain) {
+    } else if (leadProp.company_name || leadProp.company_domain) {
       setCompanyChoice(NEW_COMPANY);
-      setCompanyName(lead.company_name ?? "");
-      setCompanyDomain(lead.company_domain ?? "");
+      setCompanyName(leadProp.company_name ?? "");
+      setCompanyDomain(leadProp.company_domain ?? "");
     } else {
       setCompanyChoice(NO_COMPANY);
       setCompanyName("");
       setCompanyDomain("");
     }
     setActivities(null);
-    setCustomFields(null);
     setTags(null);
     setAssociatedDeal(null);
     let cancelled = false;
-    getLeadDetails(lead.id).then((d) => {
+    // Différer le fetch détails (activities + tags + associatedDeal) de
+    // 100ms : l'animation d'ouverture du drawer a le temps de finir avant
+    // qu'on charge le contenu lourd (≈3 DB queries). Améliore l'INP perçu.
+    const handle = setTimeout(() => {
       if (cancelled) return;
-      setActivities(d.activities as unknown as Activity[]);
-      setCustomFields(d.customFields);
-      setTags(d.tags);
-      setAssociatedDeal(d.associatedDeal);
-    });
+      getLeadDetails(leadProp.id).then((d) => {
+        if (cancelled) return;
+        setActivities(d.activities as unknown as Activity[]);
+        setTags(d.tags);
+        setAssociatedDeal(d.associatedDeal);
+      });
+    }, 100);
     return () => {
       cancelled = true;
+      clearTimeout(handle);
     };
-  }, [lead]);
+  }, [leadProp]);
 
   if (!lead) {
     return (
@@ -156,12 +172,44 @@ export function LeadDrawer({
   // Capture id + initial values for stable closures.
   const leadId = lead.id;
 
+  // Helper unifié pour tous les saves inline : optimistic update du state
+  // local AVANT le server call (évite le flash de retour à l'ancienne
+  // valeur causé par useInlineOptimistic qui reset son override à
+  // propValue à la fin de la transition). En cas d'erreur serveur, on
+  // rollback automatiquement aux valeurs précédentes + toast d'erreur.
+  async function saveAndUpdate(patch: LeadUpdatePatch) {
+    // 1) Capture les valeurs actuelles pour rollback éventuel
+    const rollback: LeadUpdatePatch = {};
+    if (lead) {
+      for (const key of Object.keys(patch) as (keyof LeadUpdatePatch)[]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (rollback as any)[key] = (lead as any)[key] ?? null;
+      }
+    }
+
+    // 2) Optimistic update — le rendu reflète la nouvelle valeur dès
+    //    avant la réponse serveur.
+    setLead((prev) =>
+      prev ? ({ ...prev, ...patch } as LeadWithDedup) : prev
+    );
+
+    // 3) Server save
+    const res = await updateLead(leadId, patch);
+
+    if (!res.success) {
+      // 4) Rollback
+      setLead((prev) =>
+        prev ? ({ ...prev, ...rollback } as LeadWithDedup) : prev
+      );
+    }
+    return res;
+  }
+
   // Generic per-field saver. The form controls (InlineText/InlinePicker) all
   // hand back string|null, so we wrap that into the typed patch shape.
   function saveText(key: keyof LeadUpdatePatch) {
     return async (next: string | null) => {
-      const res = await updateLead(leadId, { [key]: next } as LeadUpdatePatch);
-      return res;
+      return saveAndUpdate({ [key]: next } as LeadUpdatePatch);
     };
   }
 
@@ -171,19 +219,19 @@ export function LeadDrawer({
     if (num != null && Number.isNaN(num)) {
       return { success: false as const, error: "Montant invalide." };
     }
-    return updateLead(leadId, { estimated_budget: num });
+    return saveAndUpdate({ estimated_budget: num });
   }
 
   // Score save: integer 1-5 or null.
   async function saveScore(next: number | null) {
-    return updateLead(leadId, { qualification_score: next });
+    return saveAndUpdate({ qualification_score: next });
   }
 
   // Date save for next_follow_up_at — input date returns YYYY-MM-DD which
   // Postgres casts cleanly to timestamptz.
   function saveDateField(key: keyof LeadUpdatePatch) {
     return async (next: string | null) => {
-      return updateLead(leadId, { [key]: next } as LeadUpdatePatch);
+      return saveAndUpdate({ [key]: next } as LeadUpdatePatch);
     };
   }
 
@@ -208,6 +256,7 @@ export function LeadDrawer({
         setError(res.error);
         return;
       }
+      onLeadChanged?.(leadId, { converted: true });
       onSuccess?.();
     });
   }
@@ -219,6 +268,7 @@ export function LeadDrawer({
         toast.error(res.error);
         return;
       }
+      onLeadChanged?.(leadId, { qualified: true });
       onSuccess?.();
     });
   }
@@ -230,6 +280,7 @@ export function LeadDrawer({
         toast.error(res.error);
         return;
       }
+      onLeadChanged?.(leadId, { dismissed: true });
       onSuccess?.();
     });
   }
@@ -510,15 +561,6 @@ export function LeadDrawer({
               )}
             </Section>
 
-            {customFields === null ? (
-              <SectionSkeleton />
-            ) : (
-              <CustomFieldsPanel
-                entityType="lead_import"
-                entityId={leadId}
-                initialFields={customFields}
-              />
-            )}
 
             {activities === null ? (
               <SectionSkeleton />
@@ -650,118 +692,42 @@ function SectionSkeleton() {
 
 // ============================================================
 // External links — Google Maps, Societe.com, Pappers, LinkedIn,
-// Site web, Pages Jaunes. Construits à la volée depuis raw_payload
-// + colonnes du lead. N'affiche que les liens où la donnée existe.
+// Site web, Pages Jaunes. Délégué à `@/lib/external-links` (helper
+// partagé avec CompanyDetailClient depuis migration 045).
 // ============================================================
 
-type ExternalLinkItem = {
-  id: string;
-  url: string;
-  label: string;
-  Icon: React.ComponentType<{ className?: string }>;
-};
-
-function buildExternalLinks(lead: LeadWithDedup): ExternalLinkItem[] {
-  const items: ExternalLinkItem[] = [];
+function buildLeadExternalLinks(lead: LeadWithDedup) {
   const payload = (lead.raw_payload ?? {}) as Record<string, unknown>;
-
-  // 1. Google Maps — URL canonique si dispo, sinon construction depuis place_id
-  const gmapsUrl =
-    typeof payload.google_maps_url === "string"
-      ? payload.google_maps_url
-      : null;
-  const placeId =
-    typeof payload.place_id === "string" ? payload.place_id : null;
-  if (gmapsUrl) {
-    items.push({
-      id: "gmaps",
-      url: gmapsUrl,
-      label: "Google Maps",
-      Icon: MapPin,
-    });
-  } else if (placeId) {
-    const cleanedId = placeId.startsWith("places/") ? placeId.slice(7) : placeId;
-    items.push({
-      id: "gmaps",
-      url: `https://www.google.com/maps/place/?q=place_id:${cleanedId}`,
-      label: "Google Maps",
-      Icon: MapPin,
-    });
-  }
-
-  // 2 & 3. Societe.com + Pappers — depuis SIREN
-  const siren = typeof payload.siren === "string" ? payload.siren : null;
-  if (siren) {
-    items.push({
-      id: "societe",
-      url: `https://www.societe.com/cgi-bin/search?champs=${siren}`,
-      label: "Societe.com",
-      Icon: Building2,
-    });
-    items.push({
-      id: "pappers",
-      url: `https://www.pappers.fr/entreprise/${siren}`,
-      label: "Pappers",
-      Icon: FileText,
-    });
-  }
-
-  // 4. LinkedIn dirigeant — URL directe depuis raw_payload
-  const linkedin =
-    typeof payload.linkedin === "string" ? payload.linkedin : null;
-  if (linkedin) {
-    items.push({
-      id: "linkedin",
-      url: linkedin,
-      label: "LinkedIn dirigeant",
-      Icon: Briefcase,
-    });
-  }
-
-  // 5. Site web — depuis raw_payload.website ou company_domain
   const websiteRaw =
     typeof payload.website === "string" ? payload.website : null;
-  const fallbackDomain = lead.company_domain;
-  const finalWebsite = websiteRaw ?? fallbackDomain;
-  if (finalWebsite) {
-    const normalized = /^https?:\/\//i.test(finalWebsite)
-      ? finalWebsite
-      : `https://${finalWebsite}`;
-    items.push({
-      id: "website",
-      url: normalized,
-      label: "Site web",
-      Icon: Globe,
-    });
-  }
-
-  // 6. Pages Jaunes — depuis nom + ville
-  const location =
-    typeof payload.location === "string" ? payload.location : null;
-  if (lead.company_name && location) {
-    const params = new URLSearchParams({
-      quoiqui: lead.company_name,
-      ou: location,
-    });
-    items.push({
-      id: "pagesjaunes",
-      url: `https://www.pagesjaunes.fr/recherche/?${params.toString()}`,
-      label: "Pages Jaunes",
-      Icon: BookText,
-    });
-  }
-
-  return items;
+  return buildExternalLinks({
+    google_maps_url:
+      typeof payload.google_maps_url === "string"
+        ? payload.google_maps_url
+        : null,
+    place_id: typeof payload.place_id === "string" ? payload.place_id : null,
+    siren: typeof payload.siren === "string" ? payload.siren : null,
+    linkedin:
+      typeof payload.linkedin === "string" ? payload.linkedin : null,
+    website: websiteRaw ?? lead.company_domain ?? null,
+    company_name: lead.company_name,
+    location:
+      typeof payload.location === "string" ? payload.location : null,
+    // address utilisée par le fallback Maps quand pas de place_id ni URL
+    // canonique. raw_payload.address est présent sur ~68% des leads.
+    address:
+      typeof payload.address === "string" ? payload.address : null,
+  });
 }
 
 function ExternalLinksSection({ lead }: { lead: LeadWithDedup }) {
-  const items = buildExternalLinks(lead);
+  const items = buildLeadExternalLinks(lead);
   if (items.length === 0) return null;
 
   return (
     <Section title="Liens externes">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-        {items.map(({ id, url, label, Icon }) => (
+        {items.map(({ id, url, label, icon: Icon }) => (
           <a
             key={id}
             href={url}

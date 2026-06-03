@@ -26,16 +26,18 @@ import {
   updateProject,
   type ProjectInput,
 } from "@/lib/actions/projects";
+import { DriveFolderButton } from "@/components/integrations/drive-folder-button";
+import { projectStatuses } from "@/lib/statuses";
 import type { Project, ProjectStatus } from "@/types";
 
 const NO_VALUE = "__none__";
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
-  en_attente: "En attente",
-  en_cours: "En cours",
-  en_pause: "En pause",
-  termine: "Terminé",
-  annule: "Annulé",
+  en_attente: projectStatuses.en_attente.label,
+  en_cours: projectStatuses.en_cours.label,
+  en_pause: projectStatuses.en_pause.label,
+  termine: projectStatuses.termine.label,
+  annule: projectStatuses.annule.label,
 };
 
 interface ProjectDrawerProps {
@@ -379,6 +381,17 @@ export function ProjectDrawer({
                   />
                 </div>
               </div>
+
+              {isEdit && project?.id && (
+                <div className="space-y-1.5">
+                  <Label>Documents</Label>
+                  <DriveFolderButton
+                    kind="project"
+                    id={project.id}
+                    initialUrl={project.drive_folder_url ?? null}
+                  />
+                </div>
+              )}
 
               {error && (
                 <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 px-2.5 py-1.5 rounded-sm">

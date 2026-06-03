@@ -424,3 +424,17 @@ export async function getInvoiceWithDetails(id: string) {
 
   return { ...invoice, items: items ?? [] };
 }
+
+// ============================================================
+// LIST — Phase D3
+// ============================================================
+export async function listInvoicesWithRelations() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("invoices")
+    .select(
+      "*, project:projects(id, name), contact:contacts(id, first_name, last_name), company:companies(id, name)"
+    )
+    .order("created_at", { ascending: false });
+  return data ?? [];
+}
