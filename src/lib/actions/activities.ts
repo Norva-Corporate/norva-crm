@@ -55,7 +55,6 @@ export async function createActivity(
     deal: "/dashboard/pipeline",
     project: `/dashboard/projets/${data.entity_id}`,
     invoice: `/dashboard/facturation/${data.entity_id}`,
-    contrat: "/dashboard/contrats",
     lead_import: "/dashboard/leads",
   };
   revalidatePath(map[data.entity_type]);
@@ -94,7 +93,6 @@ export async function deleteActivity(id: string): Promise<ActionResult> {
     deal: "/dashboard/pipeline",
     project: `/dashboard/projets/${entityId}`,
     invoice: `/dashboard/facturation/${entityId}`,
-    contrat: "/dashboard/contrats",
     lead_import: "/dashboard/leads",
   };
   revalidatePath(map[entityType]);

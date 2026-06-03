@@ -3,22 +3,14 @@ import React, { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
   FileText,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Th, TableHeadRow } from "@/components/ui/data-table";
+import { RowActions } from "@/components/ui/row-actions";
 import { InvoiceDrawer } from "@/components/facturation/InvoiceDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
 import { deleteInvoice } from "@/lib/actions/invoices";
@@ -28,18 +20,10 @@ import {
   cn,
   getEffectiveInvoiceStatus,
 } from "@/lib/utils";
+import { invoiceStatuses } from "@/lib/statuses";
 import type { Invoice, InvoiceStatus, DocumentType } from "@/types";
 
-const STATUS_CONFIG: Record<
-  InvoiceStatus,
-  { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }
-> = {
-  brouillon: { label: "Brouillon", variant: "secondary" },
-  envoyee: { label: "Envoyée", variant: "default" },
-  payee: { label: "Payée", variant: "success" },
-  en_retard: { label: "En retard", variant: "destructive" },
-  annulee: { label: "Annulée", variant: "secondary" },
-};
+const STATUS_CONFIG = invoiceStatuses;
 
 const STATUS_FILTERS: { key: "all" | InvoiceStatus; label: string }[] = [
   { key: "all", label: "Toutes" },
@@ -284,31 +268,10 @@ export function FacturationClient({
                         </span>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(inv)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDeleting(inv)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <RowActions
+                      onEdit={() => openEdit(inv)}
+                      onDelete={() => setDeleting(inv)}
+                    />
                   </div>
                 </Card>
               );
@@ -321,7 +284,7 @@ export function FacturationClient({
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+                <TableHeadRow>
                   <Th>Numéro</Th>
                   <Th>Client</Th>
                   <Th>Projet</Th>
@@ -329,7 +292,7 @@ export function FacturationClient({
                   <Th>Statut</Th>
                   <Th>Échéance</Th>
                   <th className="w-10" />
-                </tr>
+                </TableHeadRow>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
@@ -403,26 +366,11 @@ export function FacturationClient({
                           className="px-4 py-3"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon-sm">
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEdit(inv)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => setDeleting(inv)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <RowActions
+                            onEdit={() => openEdit(inv)}
+                            onDelete={() => setDeleting(inv)}
+                            stopPropagation={false}
+                          />
                         </td>
                       </tr>
                     );
@@ -453,25 +401,6 @@ export function FacturationClient({
         onConfirm={handleDelete}
       />
     </>
-  );
-}
-
-function Th({
-  children,
-  align = "left",
-}: {
-  children: React.ReactNode;
-  align?: "left" | "right";
-}) {
-  return (
-    <th
-      className={cn(
-        "px-4 py-2.5 text-xs font-medium text-muted-foreground",
-        align === "right" ? "text-right" : "text-left"
-      )}
-    >
-      {children}
-    </th>
   );
 }
 

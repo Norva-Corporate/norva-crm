@@ -1,7 +1,8 @@
 import "server-only";
 
-import puppeteer, { type Browser } from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { htmlToPdfBuffer } from "@/lib/pdf/launch-browser";
+import { escapeHtml } from "@/lib/html";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 export interface InvoiceForPdf {
   number: string;
@@ -26,33 +27,9 @@ export interface InvoiceForPdf {
 const VAT_REGIME =
   "TVA non applicable, art. 293 B du CGI (à adapter selon votre régime).";
 
-// ── Helpers ─────────────────────────────────────────────────
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function formatEUR(n: number): string {
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function formatDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(d));
-}
+// Currency formatter — utils.ts exports `formatCurrency` which we import.
+// Wrap it here only to keep call sites short.
+const formatEUR = (n: number) => formatCurrency(n);
 
 // ── HTML template ───────────────────────────────────────────
 function buildHtml(invoice: InvoiceForPdf): string {
@@ -427,32 +404,6 @@ function buildHtml(invoice: InvoiceForPdf): string {
 </html>`;
 }
 
-// ── Browser bootstrap (même pattern que generate-brief-pdf.ts) ──
-const CHROMIUM_PACK_URL =
-  "https://github.com/Sparticuz/chromium/releases/download/v148.0.0/chromium-v148.0.0-pack.x64.tar";
-
-async function launchBrowser(): Promise<Browser> {
-  const local = process.env.LOCAL_CHROMIUM_PATH;
-  if (local) {
-    console.log("[invoices/pdf] launching local chromium:", local);
-    return puppeteer.launch({
-      executablePath: local,
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-  }
-  console.log(
-    "[invoices/pdf] resolving @sparticuz/chromium from:",
-    CHROMIUM_PACK_URL
-  );
-  const execPath = await chromium.executablePath(CHROMIUM_PACK_URL);
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: execPath,
-    headless: true,
-  });
-}
-
 // ── Public API ──────────────────────────────────────────────
 export async function generateInvoicePdf(
   invoice: InvoiceForPdf
@@ -461,24 +412,7 @@ export async function generateInvoicePdf(
     `[invoices/pdf] start generation for ${invoice.type} ${invoice.number}`
   );
   const html = buildHtml(invoice);
-
-  const browser = await launchBrowser();
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-    await page.evaluate(() => document.fonts.ready);
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true,
-    });
-    console.log(
-      `[invoices/pdf] rendered ${invoice.number}, bytes=${pdf.length}`
-    );
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
-  }
+  return htmlToPdfBuffer(html, "invoices/pdf");
 }
 
 export function invoicePdfFilename(invoice: InvoiceForPdf): string {

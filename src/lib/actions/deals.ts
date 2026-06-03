@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
@@ -185,6 +186,21 @@ export async function updateDealStage(
   void syncEntityToAllConnectedUsers("deal", id).catch((e) =>
     console.error("[gcal sync] updateDealStage:", e)
   );
+
+  // Auto-création du dossier Drive quand le deal entre en phase
+  // commerciale (passage à `discussion`). Idempotent : si le dossier
+  // existe déjà, ensureDealDriveFolder court-circuite. Déféré via
+  // after() pour ne pas bloquer le drag.
+  if (stage === "discussion") {
+    after(async () => {
+      const { ensureDealDriveFolder } = await import("@/lib/actions/deals");
+      const res = await ensureDealDriveFolder(id);
+      if (!res.success) {
+        console.error("[drive auto] updateDealStage:", res.error);
+      }
+    });
+  }
+
   revalidateDeals();
   return { success: true, data: null };
 }
@@ -213,4 +229,73 @@ export async function deleteDeal(id: string): Promise<ActionResult> {
   );
   revalidateDeals();
   return { success: true, data: null };
+}
+
+// ============================================================
+// GOOGLE DRIVE (Phase C, 039) — auto-création de dossier
+// ============================================================
+/**
+ * Idempotent : crée un dossier Drive lié à ce deal si aucun n'existe,
+ * sinon renvoie l'URL en cache. Utilise le scope `drive.file` du
+ * provider google_calendar (cf. connect/route.ts).
+ */
+export async function ensureDealDriveFolder(
+  dealId: string
+): Promise<ActionResult<{ url: string }>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const { data: deal, error: readErr } = await supabase
+    .from("deals")
+    .select("id, title, drive_folder_id, drive_folder_url")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (readErr || !deal) {
+    return { success: false, error: readErr?.message ?? "Deal introuvable." };
+  }
+
+  // Cache hit
+  if (deal.drive_folder_url && deal.drive_folder_id) {
+    return { success: true, data: { url: deal.drive_folder_url } };
+  }
+
+  // Création via la lib Drive
+  let folder;
+  try {
+    const { createDealDriveFolder } = await import(
+      "@/lib/integrations/google-drive"
+    );
+    folder = await createDealDriveFolder(user.id, deal.title);
+  } catch (err) {
+    const msg = (err as Error).message ?? "Création Drive impossible.";
+    console.error("[drive] ensureDealDriveFolder:", err);
+    return {
+      success: false,
+      error: msg.includes("no google_calendar integration")
+        ? "Connectez Google Drive dans Intégrations d'abord."
+        : msg.includes("invalid_grant")
+        ? "Reconnectez votre compte Google (re-auth nécessaire)."
+        : "Création du dossier Drive impossible.",
+    };
+  }
+
+  const { error: updErr } = await supabase
+    .from("deals")
+    .update({
+      drive_folder_id: folder.id,
+      drive_folder_url: folder.webViewLink,
+    })
+    .eq("id", dealId);
+  if (updErr) {
+    console.error("[drive] cache write failed:", updErr);
+    // Le dossier est créé côté Google mais on n'a pas pu cache l'URL.
+    // On renvoie l'URL quand même, l'utilisateur peut l'utiliser.
+    return { success: true, data: { url: folder.webViewLink } };
+  }
+
+  revalidateDeals();
+  return { success: true, data: { url: folder.webViewLink } };
 }

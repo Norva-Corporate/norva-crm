@@ -4,29 +4,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  MoreHorizontal,
   Globe,
   Phone,
   Building2,
-  Pencil,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
   Users,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { CompanyDrawer } from "@/components/contacts/CompanyDrawer";
 import { DeleteModal } from "@/components/contacts/DeleteModal";
+import { Th, TableHeadRow, EmptyTableRow } from "@/components/ui/data-table";
+import { RowActions } from "@/components/ui/row-actions";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { deleteCompany } from "@/lib/actions/contacts";
 import { getInitials, cn } from "@/lib/utils";
 import type { Company } from "@/types";
@@ -169,26 +160,10 @@ export function CompaniesClient({ initialCompanies }: Props) {
                       </div>
                     </Link>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm" className="shrink-0">
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEdit(company)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                        Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setDeleting(company)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <RowActions
+                    onEdit={() => openEdit(company)}
+                    onDelete={() => setDeleting(company)}
+                  />
                 </div>
               </Card>
             ))
@@ -200,32 +175,23 @@ export function CompaniesClient({ initialCompanies }: Props) {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+                <TableHeadRow>
                   <Th>Entreprise</Th>
                   <Th>Secteur</Th>
                   <Th>Contacts</Th>
                   <Th>Site web</Th>
                   <Th>Téléphone</Th>
                   <th className="w-10" />
-                </tr>
+                </TableHeadRow>
               </thead>
               <tbody>
                 {paginated.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-4 py-16 text-center text-sm text-muted-foreground"
-                    >
-                      <Building2 className="h-6 w-6 mx-auto mb-2 text-muted-foreground/60" />
-                      Aucune entreprise trouvée.{" "}
-                      <button
-                        onClick={openCreate}
-                        className="text-accent hover:underline"
-                      >
-                        Créer la première
-                      </button>
-                    </td>
-                  </tr>
+                  <EmptyTableRow
+                    colSpan={6}
+                    icon={Building2}
+                    label="Aucune entreprise trouvée."
+                    cta={{ label: "Créer la première", onClick: openCreate }}
+                  />
                 ) : (
                   paginated.map((company, idx) => (
                     <tr
@@ -299,26 +265,11 @@ export function CompaniesClient({ initialCompanies }: Props) {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm">
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(company)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                              Modifier
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => setDeleting(company)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <RowActions
+                          onEdit={() => openEdit(company)}
+                          onDelete={() => setDeleting(company)}
+                          stopPropagation={false}
+                        />
                       </td>
                     </tr>
                   ))
@@ -328,39 +279,13 @@ export function CompaniesClient({ initialCompanies }: Props) {
           </div>
         </Card>
 
-        {filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between gap-2 px-3 md:px-4 py-3 mt-2 border border-[var(--border)] bg-[var(--surface)]">
-            <p className="text-[11px] md:text-xs text-muted-foreground">
-              <span className="hidden sm:inline">Page </span>
-              {safePage}/{totalPages}
-              <span className="hidden sm:inline">
-                {" "}— {(safePage - 1) * PAGE_SIZE + 1}-
-                {Math.min(safePage * PAGE_SIZE, filtered.length)} sur{" "}
-                {filtered.length}
-              </span>
-            </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() =>
-                  setPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={safePage === totalPages}
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <ListPagination
+          page={safePage}
+          totalPages={totalPages}
+          pageSize={PAGE_SIZE}
+          total={filtered.length}
+          onPageChange={setPage}
+        />
       </div>
 
       <CompanyDrawer
@@ -383,13 +308,5 @@ export function CompaniesClient({ initialCompanies }: Props) {
         onConfirm={handleDeleted}
       />
     </>
-  );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
-      {children}
-    </th>
   );
 }

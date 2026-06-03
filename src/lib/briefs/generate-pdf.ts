@@ -1,6 +1,7 @@
 import "server-only";
 
 import { htmlToPdfBuffer } from "@/lib/pdf/launch-browser";
+import { escapeHtml } from "@/lib/html";
 import {
   BRIEF_SECTIONS,
   groupReponsesBySections,
@@ -20,15 +21,6 @@ export interface BriefForPdf {
 }
 
 // ── HTML helpers ────────────────────────────────────────────
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }

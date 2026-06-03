@@ -55,12 +55,28 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+export type ReportPeriod = "30d" | "90d" | "ytd" | "12m";
+
+export interface ReportFilters {
+  period: ReportPeriod;
+  ownerId: string | null;
+}
+
+export interface LeadFunnel {
+  leads_imported: number;
+  leads_qualified: number;
+  deals_created: number;
+  deals_won: number;
+}
+
 export interface ReportData {
+  filters: ReportFilters;
   monthly: MonthlyRevenue[];
   pipelineByStage: StageBucket[];
   pipelineWeighted: number;
   pipelineTotal: number;
   conversionByStage: { stage: string; count: number }[];
+  leadFunnel: LeadFunnel;
   winRate: number | null;
   winRateBase: number;
   averageDealSize: number;
@@ -71,7 +87,31 @@ export interface ReportData {
   totalInvoicedYTD: number;
 }
 
-export async function getReportData(): Promise<ReportData> {
+/**
+ * Calcule la date de début pour une période donnée.
+ * 'ytd' = 1er janvier de l'année courante.
+ * '30d'/'90d' = aujourd'hui - N jours.
+ * '12m' = 1er du mois courant - 11 mois (idem que la fenêtre du chart).
+ */
+function periodStart(period: ReportPeriod): Date {
+  const today = new Date();
+  if (period === "ytd") return new Date(today.getFullYear(), 0, 1);
+  if (period === "30d") {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 30);
+    return d;
+  }
+  if (period === "90d") {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 90);
+    return d;
+  }
+  return new Date(today.getFullYear(), today.getMonth() - 11, 1);
+}
+
+export async function getReportData(
+  filters: ReportFilters = { period: "ytd", ownerId: null }
+): Promise<ReportData> {
   const supabase = await createClient();
 
   const today = new Date();
@@ -79,22 +119,61 @@ export async function getReportData(): Promise<ReportData> {
   const start12mo = new Date(today.getFullYear(), today.getMonth() - 11, 1);
   const start12moISO = start12mo.toISOString().split("T")[0];
 
-  const [{ data: invoices }, { data: deals }, { data: profiles }] =
-    await Promise.all([
-      supabase
-        .from("invoices")
-        .select(
-          "id, type, status, total, issue_date, company_id, contact_id, company:companies(id, name), contact:contacts(id, first_name, last_name)"
-        )
-        .eq("type", "invoice")
-        .neq("status", "annulee"),
-      supabase
-        .from("deals")
-        .select(
-          "id, value, stage, probability, assigned_to, created_at, updated_at"
-        ),
-      supabase.from("profiles").select("id, full_name, email"),
-    ]);
+  // Borne basse pour la période demandée (filtre KPIs + funnel + members).
+  const periodStartISO = periodStart(filters.period).toISOString();
+
+  // Query deals avec un filtre optionnel sur assigned_to (ownerId).
+  // On charge tous les deals (state pipeline current), le filtre période
+  // s'applique en runtime sur winRate / averageDays / members.
+  let dealsQuery = supabase
+    .from("deals")
+    .select(
+      "id, value, stage, probability, assigned_to, created_at, updated_at"
+    );
+  if (filters.ownerId) {
+    dealsQuery = dealsQuery.eq("assigned_to", filters.ownerId);
+  }
+
+  // Query leads pour le funnel — limité à la période + filtre owner.
+  // On compte côté query plutôt qu'en mémoire pour rester scalable.
+  let leadsImportedQuery = supabase
+    .from("lead_imports")
+    .select("id", { count: "exact", head: true })
+    .gte("imported_at", periodStartISO);
+  if (filters.ownerId) {
+    leadsImportedQuery = leadsImportedQuery.eq("assigned_to", filters.ownerId);
+  }
+  let leadsQualifiedQuery = supabase
+    .from("lead_imports")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "qualified")
+    .gte("stage_updated_at", periodStartISO);
+  if (filters.ownerId) {
+    leadsQualifiedQuery = leadsQualifiedQuery.eq(
+      "assigned_to",
+      filters.ownerId
+    );
+  }
+
+  const [
+    { data: invoices },
+    { data: deals },
+    { data: profiles },
+    { count: leadsImportedCount },
+    { count: leadsQualifiedCount },
+  ] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select(
+        "id, type, status, total, issue_date, company_id, contact_id, company:companies(id, name), contact:contacts(id, first_name, last_name)"
+      )
+      .eq("type", "invoice")
+      .neq("status", "annulee"),
+    dealsQuery,
+    supabase.from("profiles").select("id, full_name, email"),
+    leadsImportedQuery,
+    leadsQualifiedQuery,
+  ]);
 
   const profilesById = new Map(
     (profiles ?? []).map((p) => [p.id, p])
@@ -165,15 +244,12 @@ export async function getReportData(): Promise<ReportData> {
     count: stageMap.get(s)?.count ?? 0,
   }));
 
-  // ----- Win rate over last 90 days
-  const ninetyAgo = new Date();
-  ninetyAgo.setDate(ninetyAgo.getDate() - 90);
-  const ninetyAgoISO = ninetyAgo.toISOString();
+  // ----- Win rate sur la période sélectionnée (was: hardcoded 90 jours)
   const closed = (deals ?? []).filter(
     (d) =>
       (d.stage === "won" || d.stage === "lost") &&
       d.updated_at &&
-      d.updated_at >= ninetyAgoISO
+      d.updated_at >= periodStartISO
   );
   const wonClosed = closed.filter((d) => d.stage === "won");
   const winRate =
@@ -283,12 +359,31 @@ export async function getReportData(): Promise<ReportData> {
     .filter((i) => i.issue_date >= startYear)
     .reduce((s, i) => s + (Number(i.total) || 0), 0);
 
+  // ----- Funnel lead → qualified → deal → won sur la période choisie.
+  // Le filtre owner s'applique côté query (lead_imports.assigned_to,
+  // deals.assigned_to) — voir queries ci-dessus.
+  const dealsInPeriod = (deals ?? []).filter(
+    (d) => d.created_at && d.created_at >= periodStartISO
+  );
+  const wonInPeriod = (deals ?? []).filter(
+    (d) =>
+      d.stage === "won" && d.updated_at && d.updated_at >= periodStartISO
+  );
+  const leadFunnel: LeadFunnel = {
+    leads_imported: leadsImportedCount ?? 0,
+    leads_qualified: leadsQualifiedCount ?? 0,
+    deals_created: dealsInPeriod.length,
+    deals_won: wonInPeriod.length,
+  };
+
   return {
+    filters,
     monthly,
     pipelineByStage,
     pipelineWeighted,
     pipelineTotal,
     conversionByStage,
+    leadFunnel,
     winRate,
     winRateBase: closed.length,
     averageDealSize,
@@ -299,3 +394,4 @@ export async function getReportData(): Promise<ReportData> {
     totalInvoicedYTD,
   };
 }
+

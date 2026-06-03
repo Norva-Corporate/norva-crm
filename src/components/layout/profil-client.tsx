@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Users } from "lucide-react";
+import { Loader2, Save, Users, ListChecks } from "lucide-react";
+import Link from "next/link";
 import { getInitials } from "@/lib/utils";
 import {
   updateProfileAction,
@@ -142,6 +143,27 @@ export function ProfilClient({ profile, teamMembers }: Props) {
                 Sauvegarder
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Settings — accès rapides */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Paramètres</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Link
+              href="/dashboard/settings/task-templates"
+              className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--muted)]/30 transition-colors"
+            >
+              <ListChecks className="h-4 w-4 text-accent" />
+              <div className="flex-1">
+                <p className="text-sm text-foreground">Templates de tâches</p>
+                <p className="text-xs text-muted-foreground">
+                  Gérer les listes de tâches réutilisables (onboarding, suivi, etc.)
+                </p>
+              </div>
+            </Link>
           </CardContent>
         </Card>
 

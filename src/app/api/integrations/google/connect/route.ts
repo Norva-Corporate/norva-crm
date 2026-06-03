@@ -6,7 +6,13 @@ import { signState } from "@/lib/integrations/crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SCOPES = ["https://www.googleapis.com/auth/calendar"];
+const SCOPES = [
+  "https://www.googleapis.com/auth/calendar",
+  // drive.file = accès uniquement aux fichiers/dossiers créés par l'app
+  // (pas d'accès au reste du Drive de l'utilisateur). Suffisant pour
+  // l'auto-création de dossier deal/projet (Phase C, 039).
+  "https://www.googleapis.com/auth/drive.file",
+];
 
 export async function GET(_req: NextRequest) {
   const supabase = await createClient();

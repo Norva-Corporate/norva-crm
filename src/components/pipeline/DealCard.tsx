@@ -26,7 +26,7 @@ interface DealCardProps {
   onStageChanged?: (newStage: DealStage) => void;
 }
 
-export function DealCard({
+function DealCardImpl({
   deal,
   onOpen,
   overlay = false,
@@ -203,3 +203,8 @@ export function DealCard({
     </div>
   );
 }
+
+// React.memo : évite les rerenders inutiles dans le kanban quand une autre
+// carte change. Comparaison superficielle suffit — les callbacks (onOpen,
+// onStageChanged) sont stabilisés en amont via useCallback.
+export const DealCard = React.memo(DealCardImpl);

@@ -131,3 +131,41 @@ Insérés dans `lead_imports` (source='multica-lead-intake',
 pipeline_stage='brut'). Visibles : /dashboard/leads colonne "Brut" — à
 revoir manuellement avant validation.
 ```
+
+## Coût Places — caps et observabilité
+
+La skill `prospection-google-places` est enveloppée d'un cache + cap +
+dedup (voir sa SKILL.md). Tu n'as rien à faire de plus côté Lead
+Intake — mais sache que :
+
+- **Cache 30 jours** : relancer `coiffeur bourgoin` deux fois dans le
+  mois ne coûte qu'une seule requête Google.
+- **Cap quotidien** réglé sur `prospection_settings.places_max_searches_per_day`
+  (défaut `20`). Si tu atteins le cap, la skill STOP proprement avec un
+  message ; reprends le lendemain ou bump le cap :
+
+      UPDATE public.prospection_settings
+         SET value = '30'
+       WHERE key = 'places_max_searches_per_day';
+
+- **Vois ce que tu as consommé aujourd'hui** :
+
+      SELECT
+        count(*) filter (where cache_hit)            AS hits,
+        count(*) filter (where not cache_hit)        AS appels_payants,
+        sum(new_place_ids)                           AS nouveaux_leads
+      FROM public.places_search_log
+      WHERE run_at::date = current_date;
+
+- **Tendance 14 jours** :
+
+      SELECT date_trunc('day', run_at)::date AS jour,
+             count(*) filter (where not cache_hit) AS payants,
+             count(*) filter (where cache_hit)     AS hits,
+             sum(new_place_ids)                    AS leads
+      FROM public.places_search_log
+      GROUP BY 1 ORDER BY 1 DESC LIMIT 14;
+
+- **Coaching queries** : préfère narrow (`plombier bourgoin`,
+  `électricien bourgoin`) à broad (`artisan bourgoin`). Les queries
+  broad recouvrent les narrow et consomment du cap pour rien.

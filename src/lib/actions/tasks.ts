@@ -210,3 +210,49 @@ export async function getTasksForProject(
 
   return (data ?? []) as unknown as ProjectTaskRow[];
 }
+
+// ============================================================
+// LIST — Phase D3
+// ============================================================
+/**
+ * Liste les tâches enrichies de leur projet lié (quand related_type='project').
+ * Évite la résolution N+1 au niveau de la page.
+ */
+export async function listTasksWithRelatedProject() {
+  const supabase = await createClient();
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select(
+      "*, assignee:profiles!tasks_assigned_to_fkey(id, full_name)"
+    )
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  const rows = tasks ?? [];
+  const projectIds = Array.from(
+    new Set(
+      rows
+        .filter((t) => t.related_type === "project" && t.related_id)
+        .map((t) => t.related_id as string)
+    )
+  );
+
+  let projectsMap: Record<string, string> = {};
+  if (projectIds.length > 0) {
+    const { data: projRows } = await supabase
+      .from("projects")
+      .select("id, name")
+      .in("id", projectIds);
+    projectsMap = Object.fromEntries(
+      (projRows ?? []).map((p) => [p.id, p.name])
+    );
+  }
+
+  return rows.map((t) => ({
+    ...t,
+    relatedProject:
+      t.related_type === "project" && t.related_id && projectsMap[t.related_id]
+        ? { id: t.related_id as string, name: projectsMap[t.related_id] }
+        : null,
+  }));
+}

@@ -20,7 +20,9 @@ export function IntegrationActions({ isConnected }: IntegrationActionsProps) {
   if (!isConnected) {
     return (
       <Button asChild>
-        <a href="/api/integrations/google/connect">Connecter Google Calendar</a>
+        <a href="/api/integrations/google/connect">
+          Connecter Google Calendar + Drive
+        </a>
       </Button>
     );
   }

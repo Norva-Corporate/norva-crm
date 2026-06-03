@@ -201,6 +201,74 @@ export async function deleteProject(id: string): Promise<ActionResult> {
 }
 
 // ============================================================
+// GOOGLE DRIVE (Phase C, 039) — auto-création de dossier
+// ============================================================
+/**
+ * Idempotent : crée un dossier Drive lié à ce projet si aucun
+ * n'existe, sinon renvoie l'URL en cache. Utilise le scope
+ * `drive.file` du provider google_calendar (cf. connect/route.ts).
+ */
+export async function ensureProjectDriveFolder(
+  projectId: string
+): Promise<ActionResult<{ url: string }>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié." };
+
+  const { data: project, error: readErr } = await supabase
+    .from("projects")
+    .select("id, name, drive_folder_id, drive_folder_url")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (readErr || !project) {
+    return {
+      success: false,
+      error: readErr?.message ?? "Projet introuvable.",
+    };
+  }
+
+  if (project.drive_folder_url && project.drive_folder_id) {
+    return { success: true, data: { url: project.drive_folder_url } };
+  }
+
+  let folder;
+  try {
+    const { createProjectDriveFolder } = await import(
+      "@/lib/integrations/google-drive"
+    );
+    folder = await createProjectDriveFolder(user.id, project.name);
+  } catch (err) {
+    const msg = (err as Error).message ?? "Création Drive impossible.";
+    console.error("[drive] ensureProjectDriveFolder:", err);
+    return {
+      success: false,
+      error: msg.includes("no google_calendar integration")
+        ? "Connectez Google Drive dans Intégrations d'abord."
+        : msg.includes("invalid_grant")
+        ? "Reconnectez votre compte Google (re-auth nécessaire)."
+        : "Création du dossier Drive impossible.",
+    };
+  }
+
+  const { error: updErr } = await supabase
+    .from("projects")
+    .update({
+      drive_folder_id: folder.id,
+      drive_folder_url: folder.webViewLink,
+    })
+    .eq("id", projectId);
+  if (updErr) {
+    console.error("[drive] cache write failed:", updErr);
+    return { success: true, data: { url: folder.webViewLink } };
+  }
+
+  revalidateProjects(projectId);
+  return { success: true, data: { url: folder.webViewLink } };
+}
+
+// ============================================================
 // PATCH — partial update for inline editing
 // ============================================================
 export type ProjectPatch = Partial<{
@@ -275,4 +343,18 @@ export async function getProjectWithDetails(id: string) {
     .order("created_at", { ascending: false });
 
   return { ...project, invoices: invoices ?? [] };
+}
+
+// ============================================================
+// LIST — Phase D3
+// ============================================================
+export async function listProjectsWithRelations() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("projects")
+    .select(
+      "*, deal:deals(id, title, contact:contacts(id, first_name, last_name), company:companies(id, name)), contact:contacts!projects_contact_id_fkey(id, first_name, last_name), company:companies!projects_company_id_fkey(id, name), assignee:profiles!projects_assigned_to_fkey(id, full_name)"
+    )
+    .order("created_at", { ascending: false });
+  return data ?? [];
 }
