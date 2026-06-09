@@ -9,11 +9,12 @@ export interface ToContactOwner {
 }
 
 export const TO_CONTACT_OWNERS: ReadonlyArray<ToContactOwner> = [
-  // Cyan et orange : complémentaires sur la roue chromatique → max contraste.
-  // Aucun conflit avec les autres colonnes (Vérifié bleu, Contacté violet,
-  // En discussion vert, Stand By gris).
+  // Cyan / orange / magenta : 3 couleurs très distinctes entre elles ET
+  // sans conflit avec les autres colonnes (Vérifié bleu, Contacté violet,
+  // En discussion vert, Stand By gris, À mailer indigo).
   { email: "kylian.arcier@gmail.com", shortName: "Kylian", accent: "#06B6D4" },
   { email: "lohan.ghrieb2005@gmail.com", shortName: "Lohan", accent: "#F97316" },
+  { email: "b.laurent3807@gmail.com", shortName: "Laurent", accent: "#EC4899" },
 ];
 
 export function findOwnerByEmail(

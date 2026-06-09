@@ -103,16 +103,33 @@ export function PipelineKanban({
   // Toutes les colonnes selon les profils — la liste de référence.
   const allColumns = useMemo(() => buildUnifiedColumns(profiles), [profiles]);
 
-  // Colonnes effectivement affichées : on retire la colonne 'Brut' si
-  // showBrut=false, ce qui supprime le rendu de la column ET ses cards.
+  // Colonnes effectivement affichées :
+  // 1) Retire la colonne 'Brut' si showBrut=false (sup. rendu + cards).
+  // 2) Quand un ownerFilter est actif, on masque les sous-colonnes
+  //    'À contacter — X' des AUTRES owners — sinon le board reste à
+  //    9 colonnes (Kylian/Lohan/Laurent) avec 2 colonnes systématiquement
+  //    vides, ce qui pollue le scan visuel quand on travaille sur ses
+  //    propres leads. La sous-colonne de l'owner sélectionné reste.
   const columns = useMemo(
-    () =>
-      showBrut
+    () => {
+      let cols = showBrut
         ? allColumns
         : allColumns.filter(
             (c) => !(c.kind === "lead" && c.stage === "brut")
-          ),
-    [allColumns, showBrut]
+          );
+      if (ownerProfileId) {
+        cols = cols.filter(
+          (c) =>
+            !(
+              c.kind === "lead" &&
+              c.stage === "to_contact" &&
+              c.assignedTo !== ownerProfileId
+            )
+        );
+      }
+      return cols;
+    },
+    [allColumns, showBrut, ownerProfileId]
   );
 
   // Leads filtrés selon showBrut + searchQuery + ownerProfileId + topQualityOnly.

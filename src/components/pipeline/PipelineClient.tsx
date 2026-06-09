@@ -76,10 +76,27 @@ export function PipelineClient({
   // contextuelle à la session). Min 1 char pour activer le filtre.
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filtre par owner (Kylian / Lohan / null=tous). Filtre quality top
-  // (true = uniquement les leads avec quality_score >= 80). États
-  // contextuels session, non persistés.
-  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+  // Filtre par owner (Kylian / Lohan / Laurent / null=tous). Persisté en
+  // localStorage : avec 3 owners, le board peut atteindre 9 colonnes et le
+  // choix utilisateur doit survivre aux rechargements/navigation. Le filtre
+  // épure aussi le board (cf. PipelineKanban — masque les sous-colonnes
+  // 'À contacter' des AUTRES owners quand le filtre est actif).
+  const OWNER_FILTER_STORAGE_KEY = "norva.pipeline.ownerFilter";
+  const [ownerFilter, setOwnerFilterState] = useState<string | null>(null);
+  useEffect(() => {
+    const stored = window.localStorage.getItem(OWNER_FILTER_STORAGE_KEY);
+    if (stored) setOwnerFilterState(stored);
+  }, []);
+  const setOwnerFilter = useCallback((next: string | null) => {
+    setOwnerFilterState(next);
+    if (next) {
+      window.localStorage.setItem(OWNER_FILTER_STORAGE_KEY, next);
+    } else {
+      window.localStorage.removeItem(OWNER_FILTER_STORAGE_KEY);
+    }
+  }, []);
+  // Filtre quality top (true = uniquement les leads avec quality_score >= 80).
+  // État session, non persisté.
   const [topQualityOnly, setTopQualityOnly] = useState(false);
   // Map email → profile.id pour le filtre owner (les leadProfiles ont
   // l'email + l'id, on s'en sert pour matcher lead.assigned_to).
