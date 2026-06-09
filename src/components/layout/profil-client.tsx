@@ -20,21 +20,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save, Users, ListChecks } from "lucide-react";
+import { Loader2, Save, Shield, Users, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { getInitials } from "@/lib/utils";
-import {
-  updateProfileAction,
-  updateMemberRoleAction,
-} from "@/app/(auth)/actions";
+import { updateProfileAction } from "@/app/(auth)/actions";
+import { assignUserRole } from "@/lib/actions/roles";
 import type { Profile } from "@/types";
+
+interface TeamMember {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: "admin" | "member";
+  role_id: string | null;
+  created_at: string;
+}
+
+interface AvailableRole {
+  id: string;
+  key: string;
+  name: string;
+  is_system: boolean;
+}
 
 interface Props {
   profile: Profile | null;
-  teamMembers: Profile[];
+  teamMembers: TeamMember[];
+  availableRoles: AvailableRole[];
+  canManageRoles: boolean;
 }
 
-export function ProfilClient({ profile, teamMembers }: Props) {
+export function ProfilClient({
+  profile,
+  teamMembers,
+  availableRoles,
+  canManageRoles,
+}: Props) {
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [members, setMembers] = useState(teamMembers);
   const [feedback, setFeedback] = useState<{
@@ -56,14 +77,21 @@ export function ProfilClient({ profile, teamMembers }: Props) {
     });
   }
 
-  function handleRoleChange(memberId: string, role: "admin" | "member") {
+  function handleRoleChange(memberId: string, roleId: string) {
     const previous = members;
+    const targetRole = availableRoles.find((r) => r.id === roleId);
+    const fallbackRoleKey: "admin" | "member" =
+      targetRole?.key === "admin" ? "admin" : "member";
     setMembers((prev) =>
-      prev.map((m) => (m.id === memberId ? { ...m, role } : m))
+      prev.map((m) =>
+        m.id === memberId
+          ? { ...m, role_id: roleId, role: fallbackRoleKey }
+          : m
+      )
     );
     startTransition(async () => {
-      const result = await updateMemberRoleAction(memberId, role);
-      if (result?.error) {
+      const result = await assignUserRole(memberId, roleId);
+      if (!result.success) {
         setMembers(previous);
         setFeedback({ type: "error", text: result.error });
       }
@@ -164,6 +192,20 @@ export function ProfilClient({ profile, teamMembers }: Props) {
                 </p>
               </div>
             </Link>
+            {canManageRoles && (
+              <Link
+                href="/dashboard/settings/roles"
+                className="flex items-center gap-3 px-5 py-3 border-t border-[var(--border)] hover:bg-[var(--muted)]/30 transition-colors"
+              >
+                <Shield className="h-4 w-4 text-accent" />
+                <div className="flex-1">
+                  <p className="text-sm text-foreground">Rôles & permissions</p>
+                  <p className="text-xs text-muted-foreground">
+                    Créer des rôles personnalisés et ajuster les permissions par module
+                  </p>
+                </div>
+              </Link>
+            )}
           </CardContent>
         </Card>
 
@@ -178,55 +220,66 @@ export function ProfilClient({ profile, teamMembers }: Props) {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-[var(--border)]">
-                {members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-3 px-5 py-3"
-                  >
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="text-[10px]">
-                        {member.full_name
-                          ? getInitials(member.full_name)
-                          : "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {member.full_name ?? member.email}
-                        {member.id === profile?.id && (
-                          <span className="text-[10px] text-muted-foreground ml-2">
-                            (vous)
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {member.email}
-                      </p>
+                {members.map((member) => {
+                  const memberRole = availableRoles.find(
+                    (r) => r.id === member.role_id
+                  );
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-3 px-5 py-3"
+                    >
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="text-[10px]">
+                          {member.full_name
+                            ? getInitials(member.full_name)
+                            : "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {member.full_name ?? member.email}
+                          {member.id === profile?.id && (
+                            <span className="text-[10px] text-muted-foreground ml-2">
+                              (vous)
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {member.email}
+                        </p>
+                      </div>
+                      {member.id !== profile?.id ? (
+                        <Select
+                          value={member.role_id ?? undefined}
+                          onValueChange={(v) =>
+                            handleRoleChange(member.id, v)
+                          }
+                        >
+                          <SelectTrigger className="w-44 h-7 text-xs">
+                            <SelectValue placeholder="Choisir un rôle" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableRoles.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge
+                          variant={
+                            member.role === "admin" ? "default" : "secondary"
+                          }
+                        >
+                          {memberRole?.name ??
+                            (member.role === "admin" ? "Admin" : "Membre")}
+                        </Badge>
+                      )}
                     </div>
-                    {member.id !== profile?.id ? (
-                      <Select
-                        value={member.role}
-                        onValueChange={(v) =>
-                          handleRoleChange(member.id, v as "admin" | "member")
-                        }
-                      >
-                        <SelectTrigger className="w-36 h-7 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Administrateur</SelectItem>
-                          <SelectItem value="member">Membre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge
-                        variant={member.role === "admin" ? "default" : "secondary"}
-                      >
-                        {member.role === "admin" ? "Admin" : "Membre"}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

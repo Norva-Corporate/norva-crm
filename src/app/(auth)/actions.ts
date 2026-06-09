@@ -123,38 +123,30 @@ export async function updateProfileAction(formData: FormData): Promise<AuthState
   return { message: "Profil mis à jour." };
 }
 
+/**
+ * Wrapper de compatibilité — résout la `role_key` ('admin'|'member' ou clé
+ * custom) en role_id puis délègue à `assignUserRole`. Conservé pour les
+ * appels existants ; nouveau code doit utiliser `assignUserRole` directement.
+ */
 export async function updateMemberRoleAction(
   memberId: string,
-  role: "admin" | "member"
+  roleKey: string
 ): Promise<AuthState> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: currentProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
+  const { data: role } = await supabase
+    .from("roles")
+    .select("id")
+    .eq("key", roleKey)
     .single();
 
-  if (currentProfile?.role !== "admin") {
-    return { error: "Action réservée aux administrateurs." };
+  if (!role) {
+    return { error: "Rôle introuvable." };
   }
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({ role })
-    .eq("id", memberId);
-
-  if (error) {
-    return { error: error.message };
+  const { assignUserRole } = await import("@/lib/actions/roles");
+  const result = await assignUserRole(memberId, role.id);
+  if (!result.success) {
+    return { error: result.error };
   }
-
-  revalidatePath("/dashboard/profil");
   return { message: "Rôle mis à jour." };
 }
