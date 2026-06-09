@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type {
   TaskPriority,
@@ -64,6 +65,9 @@ function revalidateTasks(relatedType?: string | null, relatedId?: string | null)
 export async function createTask(
   data: TaskInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("tasks.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -112,6 +116,9 @@ export async function updateTask(
   id: string,
   data: TaskInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("tasks.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   if (!data.title?.trim()) {
@@ -149,6 +156,9 @@ export async function updateTaskStatus(
   id: string,
   status: TaskStatus
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("tasks.update_status");
+  if (denied) return { success: false, error: denied };
+
   if (!VALID_STATUSES.includes(status)) {
     return { success: false, error: "Statut invalide." };
   }
@@ -167,6 +177,9 @@ export async function updateTaskStatus(
 }
 
 export async function deleteTask(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("tasks.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) return { success: false, error: error.message };

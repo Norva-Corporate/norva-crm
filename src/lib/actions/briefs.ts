@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createProject } from "@/lib/actions/projects";
+import { ensurePermission } from "@/lib/permissions/server";
 
 type ActionResult<T = null> =
   | { success: true; data: T }
@@ -183,6 +184,9 @@ async function requireUser(): Promise<
 }
 
 export async function archiveBriefToken(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("briefs.archive");
+  if (denied) return { success: false, error: denied };
+
   const auth = await requireUser();
   if (!auth.ok) return { success: false, error: auth.error };
 
@@ -199,6 +203,9 @@ export async function archiveBriefToken(id: string): Promise<ActionResult> {
 }
 
 export async function archiveBrief(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("briefs.archive");
+  if (denied) return { success: false, error: denied };
+
   const auth = await requireUser();
   if (!auth.ok) return { success: false, error: auth.error };
 
@@ -223,6 +230,9 @@ export async function archiveBrief(id: string): Promise<ActionResult> {
 export async function createProjectFromBrief(
   briefId: string
 ): Promise<ActionResult<{ projectId: string }>> {
+  const denied = await ensurePermission("briefs.convert_to_project");
+  if (denied) return { success: false, error: denied };
+
   const auth = await requireUser();
   if (!auth.ok) return { success: false, error: auth.error };
 

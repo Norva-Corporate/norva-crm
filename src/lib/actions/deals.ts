@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type { DealStage, DealWithRelations } from "@/types";
 
@@ -72,6 +73,9 @@ export async function getDealsWithRelations(): Promise<DealWithRelations[]> {
 export async function createDeal(
   data: DealInput
 ): Promise<ActionResult<DealWithRelations>> {
+  const denied = await ensurePermission("deals.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -122,6 +126,9 @@ export async function updateDeal(
   id: string,
   data: DealInput
 ): Promise<ActionResult<DealWithRelations>> {
+  const denied = await ensurePermission("deals.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   if (!data.title?.trim()) {
@@ -168,6 +175,16 @@ export async function updateDealStage(
   id: string,
   stage: DealStage
 ): Promise<ActionResult> {
+  // Cas spécifiques : gagné / perdu — on check la permission dédiée.
+  const requiredPerm =
+    stage === "won"
+      ? "deals.mark_won"
+      : stage === "lost"
+      ? "deals.mark_lost"
+      : "deals.update";
+  const denied = await ensurePermission(requiredPerm);
+  if (denied) return { success: false, error: denied };
+
   if (!VALID_STAGES.includes(stage)) {
     return { success: false, error: "Étape invalide." };
   }
@@ -217,6 +234,9 @@ export async function markDealLost(id: string): Promise<ActionResult> {
 // DELETE
 // ============================================================
 export async function deleteDeal(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("deals.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("deals").delete().eq("id", id);
   if (error) return { success: false, error: error.message };

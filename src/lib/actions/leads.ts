@@ -7,6 +7,7 @@ import {
   getActivitiesForEntity,
 } from "@/lib/actions/activities";
 import { getTagsForEntity } from "@/lib/actions/tags";
+import { ensurePermission } from "@/lib/permissions/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 
 export type ActionResult<T = null> =
@@ -189,6 +190,9 @@ export async function convertLead(
     company_domain?: string;
   }
 ): Promise<ActionResult<{ contact_id: string; company_id: string | null }>> {
+  const denied = await ensurePermission("leads.convert");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -344,6 +348,9 @@ export async function markLeadAsDuplicate(
   leadId: string,
   contactId: string
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("leads.dismiss");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -367,6 +374,9 @@ export async function markLeadAsDuplicate(
 }
 
 export async function dismissLead(leadId: string): Promise<ActionResult> {
+  const denied = await ensurePermission("leads.dismiss");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -678,6 +688,9 @@ export async function updateLeadStage(
   leadId: string,
   stage: LeadPipelineStage
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("leads.qualify");
+  if (denied) return { success: false, error: denied };
+
   if (!VALID_PIPELINE_STAGES.includes(stage)) {
     return { success: false, error: "Étape invalide." };
   }
@@ -740,6 +753,9 @@ export async function updateLeadStageAndAssignee(
   stage: LeadPipelineStage,
   assignedTo: string | null
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("leads.qualify");
+  if (denied) return { success: false, error: denied };
+
   if (!VALID_PIPELINE_STAGES.includes(stage)) {
     return { success: false, error: "Étape invalide." };
   }
@@ -803,6 +819,9 @@ export async function updateLeadStageAndAssignee(
  * la partie "qualifiée" du kanban). Sinon, on garde le stage actuel.
  */
 export async function qualifyLead(leadId: string): Promise<ActionResult> {
+  const denied = await ensurePermission("leads.qualify");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -869,6 +888,9 @@ export async function convertLeadToDeal(
 ): Promise<
   ActionResult<{ contact_id: string; company_id: string | null; deal_id: string }>
 > {
+  const denied = await ensurePermission("leads.convert");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -1017,12 +1039,16 @@ async function runBatch<T>(
 }
 
 export async function dismissLeadsBatch(ids: string[]): Promise<BatchResult> {
+  const denied = await ensurePermission("leads.batch");
+  if (denied) return { ok: 0, failed: ids.length, errors: [denied] };
   return runBatch(ids, dismissLead);
 }
 
 export async function qualifyLeadsBatch(ids: string[]): Promise<BatchResult> {
   // qualifyLead vérifie déjà `status='pending'` ; les leads déjà
   // qualifiés échouent silencieusement (errors.length augmente).
+  const denied = await ensurePermission("leads.batch");
+  if (denied) return { ok: 0, failed: ids.length, errors: [denied] };
   return runBatch(ids, qualifyLead);
 }
 
@@ -1031,6 +1057,9 @@ export async function assignLeadsBatch(
   assigneeId: string | null
 ): Promise<BatchResult> {
   if (ids.length === 0) return { ok: 0, failed: 0, errors: [] };
+  const denied = await ensurePermission("leads.batch");
+  if (denied) return { ok: 0, failed: ids.length, errors: [denied] };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("lead_imports")
@@ -1047,6 +1076,8 @@ export async function convertLeadsToDealsBatch(
   ids: string[],
   dealStage?: import("@/types").DealStage
 ): Promise<BatchResult> {
+  const denied = await ensurePermission("leads.batch");
+  if (denied) return { ok: 0, failed: ids.length, errors: [denied] };
   // convertLeadToDeal accepte un objet overrides ({ deal_stage, ... }).
   // Pas de transaction : si la conversion 3/5 plante, les 2 premiers
   // deals existent quand même (utile : on ne perd pas le travail).

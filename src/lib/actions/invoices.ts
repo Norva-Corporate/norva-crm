@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type { DocumentType, InvoiceStatus } from "@/types";
 
@@ -78,6 +79,9 @@ function computeTotals(items: InvoiceItemInput[], taxRate: number) {
 export async function createInvoice(
   data: InvoiceInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("invoices.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -174,6 +178,9 @@ export async function updateInvoice(
   id: string,
   data: InvoiceInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("invoices.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   if (data.status && !VALID_STATUSES.includes(data.status)) {
@@ -246,6 +253,9 @@ export async function updateInvoiceStatus(
   id: string,
   status: InvoiceStatus
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("invoices.update_status");
+  if (denied) return { success: false, error: denied };
+
   if (!VALID_STATUSES.includes(status)) {
     return { success: false, error: "Statut invalide." };
   }
@@ -269,6 +279,9 @@ export async function updateInvoiceStatus(
 // DELETE
 // ============================================================
 export async function deleteInvoice(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("invoices.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("invoices").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
@@ -289,6 +302,9 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
 export async function convertQuoteToInvoice(
   quoteId: string
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("invoices.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },

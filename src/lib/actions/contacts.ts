@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 
 // ============================================================
 // Types des payloads
@@ -52,6 +53,9 @@ function revalidateContacts() {
 export async function createContact(
   data: ContactInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("contacts.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -87,6 +91,9 @@ export async function updateContact(
   id: string,
   data: ContactInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("contacts.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   if (!data.first_name?.trim() || !data.last_name?.trim()) {
@@ -115,6 +122,9 @@ export async function updateContact(
 }
 
 export async function deleteContact(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("contacts.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("contacts").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
@@ -136,6 +146,9 @@ export async function patchContact(
   id: string,
   patch: ContactPatch
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("contacts.update");
+  if (denied) return { success: false, error: denied };
+
   if (
     "first_name" in patch &&
     (typeof patch.first_name !== "string" || !patch.first_name.trim())
@@ -194,6 +207,9 @@ export async function getContactWithDeals(id: string) {
 export async function createCompany(
   data: CompanyInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("companies.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -230,6 +246,9 @@ export async function updateCompany(
   id: string,
   data: CompanyInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("companies.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   if (!data.name?.trim()) {
@@ -259,6 +278,9 @@ export async function updateCompany(
 }
 
 export async function deleteCompany(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("companies.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("companies").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
@@ -281,6 +303,9 @@ export async function patchCompany(
   id: string,
   patch: CompanyPatch
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("companies.update");
+  if (denied) return { success: false, error: denied };
+
   if (
     "name" in patch &&
     (typeof patch.name !== "string" || !patch.name.trim())

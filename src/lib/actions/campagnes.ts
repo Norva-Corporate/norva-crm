@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/gmail";
+import { ensurePermission } from "@/lib/permissions/server";
 import type { ActionResult } from "@/lib/actions/leads";
 
 export interface EmailVariant {
@@ -38,6 +39,9 @@ export async function validateAndSendCampaign(
   campaignId: string,
   selectedVariant: EmailVariant
 ): Promise<ActionResult<null>> {
+  const denied = await ensurePermission("campaigns.validate_send");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   // Get refresh token
@@ -101,6 +105,9 @@ export async function validateAndSendCampaign(
 }
 
 export async function rejectCampaign(campaignId: string): Promise<ActionResult<null>> {
+  const denied = await ensurePermission("campaigns.reject");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   await supabase
     .from("email_campaigns")
@@ -122,6 +129,9 @@ export async function updateProspectionSetting(
   key: string,
   value: string
 ): Promise<ActionResult<null>> {
+  const denied = await ensurePermission("settings.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   await supabase
     .from("prospection_settings")

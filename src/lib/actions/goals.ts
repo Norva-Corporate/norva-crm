@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 
 // ============================================================
 // Goals — types
@@ -103,6 +104,9 @@ export async function listGoals(): Promise<Goal[]> {
 export async function createGoal(
   input: GoalInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("goals.create");
+  if (denied) return { success: false, error: denied };
+
   const err = validate(input);
   if (err) return { success: false, error: err };
 
@@ -133,6 +137,9 @@ export async function updateGoal(
   id: string,
   input: GoalInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("goals.update");
+  if (denied) return { success: false, error: denied };
+
   const err = validate(input);
   if (err) return { success: false, error: err };
 
@@ -151,6 +158,9 @@ export async function updateGoal(
 }
 
 export async function archiveGoal(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("goals.archive");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("goals")
@@ -162,6 +172,9 @@ export async function archiveGoal(id: string): Promise<ActionResult> {
 }
 
 export async function reactivateGoal(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("goals.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("goals")
@@ -173,6 +186,9 @@ export async function reactivateGoal(id: string): Promise<ActionResult> {
 }
 
 export async function deleteGoal(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("goals.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("goals").delete().eq("id", id);
   if (error) return { success: false, error: error.message };

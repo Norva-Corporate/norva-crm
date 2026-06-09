@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 import { syncEntityToAllConnectedUsers } from "@/lib/integrations/google-calendar";
 import type { ProjectStatus } from "@/types";
 
@@ -68,6 +69,9 @@ function revalidateProjects(id?: string) {
 export async function createProject(
   data: ProjectInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("projects.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -122,6 +126,9 @@ export async function updateProject(
   id: string,
   data: ProjectInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("projects.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   if (!data.name?.trim()) {
@@ -166,6 +173,9 @@ export async function updateProjectStatus(
   id: string,
   status: ProjectStatus
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("projects.update_status");
+  if (denied) return { success: false, error: denied };
+
   if (!VALID_STATUSES.includes(status)) {
     return { success: false, error: "Statut invalide." };
   }
@@ -189,6 +199,9 @@ export async function updateProjectStatus(
 // DELETE
 // ============================================================
 export async function deleteProject(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("projects.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("projects").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
@@ -289,6 +302,9 @@ export async function patchProject(
   id: string,
   patch: ProjectPatch
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("projects.update");
+  if (denied) return { success: false, error: denied };
+
   if (
     "name" in patch &&
     (typeof patch.name !== "string" || !patch.name.trim())

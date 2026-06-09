@@ -128,3 +128,26 @@ export async function hasPermission(permission: PermissionKey): Promise<boolean>
   if (current.isSystemAdmin) return true;
   return current.permissions.has(permission);
 }
+
+/**
+ * Helper "early-return" pour les Server Actions qui retournent un
+ * `ActionResult` (success/error). Retourne un message si la permission
+ * manque, `null` sinon.
+ *
+ * Usage :
+ *   const err = await ensurePermission("contacts.create");
+ *   if (err) return { success: false, error: err };
+ */
+export async function ensurePermission(
+  permission: PermissionKey
+): Promise<string | null> {
+  try {
+    await assertPermission(permission);
+    return null;
+  } catch (e) {
+    if (e instanceof PermissionDeniedError) {
+      return "Action refusée — votre rôle ne permet pas cette opération.";
+    }
+    return "Erreur d'autorisation.";
+  }
+}

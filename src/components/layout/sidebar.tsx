@@ -25,28 +25,37 @@ import {
 import { cn, getInitials } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { logoutAction } from "@/app/(auth)/actions";
+import { usePermission } from "@/hooks/use-permission";
+import { usePermissionsContext } from "@/components/permissions/permissions-provider";
+import type { PermissionKey } from "@/lib/permissions/catalog";
 import type { Profile } from "@/types";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  /**
+   * Permission requise pour voir ce lien dans la sidebar. Le tableau de
+   * bord (`/dashboard`) n'a pas de permission requise — il est toujours
+   * accessible.
+   */
+  permission?: PermissionKey;
 }
 
 const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tâches", href: "/dashboard/taches", icon: CheckSquare },
+  { label: "Tâches", href: "/dashboard/taches", icon: CheckSquare, permission: "tasks.read" },
   { label: "Calendrier", href: "/dashboard/calendrier", icon: CalendarDays },
-  { label: "Campagnes", href: "/dashboard/campagnes", icon: Mail },
-  { label: "Contacts", href: "/dashboard/contacts", icon: Users },
-  { label: "Entreprises", href: "/dashboard/companies", icon: Building2 },
-  { label: "Pipeline", href: "/dashboard/pipeline", icon: Kanban },
-  { label: "Briefs", href: "/dashboard/briefs", icon: ClipboardList },
-  { label: "Projets", href: "/dashboard/projets", icon: FolderKanban },
-  { label: "Facturation", href: "/dashboard/facturation", icon: FileText },
-  { label: "Reporting", href: "/dashboard/reporting", icon: BarChart3 },
-  { label: "Objectifs", href: "/dashboard/objectifs", icon: Target },
-  { label: "Intégrations", href: "/dashboard/integrations", icon: Plug },
+  { label: "Campagnes", href: "/dashboard/campagnes", icon: Mail, permission: "campaigns.read" },
+  { label: "Contacts", href: "/dashboard/contacts", icon: Users, permission: "contacts.read" },
+  { label: "Entreprises", href: "/dashboard/companies", icon: Building2, permission: "companies.read" },
+  { label: "Pipeline", href: "/dashboard/pipeline", icon: Kanban, permission: "deals.read" },
+  { label: "Briefs", href: "/dashboard/briefs", icon: ClipboardList, permission: "briefs.read" },
+  { label: "Projets", href: "/dashboard/projets", icon: FolderKanban, permission: "projects.read" },
+  { label: "Facturation", href: "/dashboard/facturation", icon: FileText, permission: "invoices.read" },
+  { label: "Reporting", href: "/dashboard/reporting", icon: BarChart3, permission: "reporting.read" },
+  { label: "Objectifs", href: "/dashboard/objectifs", icon: Target, permission: "goals.read" },
+  { label: "Intégrations", href: "/dashboard/integrations", icon: Plug, permission: "integrations.read" },
 ];
 
 interface SidebarProps {
@@ -55,6 +64,69 @@ interface SidebarProps {
   onToggle: () => void;
   variant?: "desktop" | "mobile";
   onNavigate?: () => void;
+}
+
+/**
+ * Wrapper qui décide d'afficher ou non un item de navigation en fonction
+ * de la permission requise. On ne peut pas appeler `usePermission` dans
+ * un `.map()` conditionnel (règle des hooks), donc on isole chaque item
+ * dans un composant.
+ */
+function NavLink({
+  item,
+  isActive,
+  collapsed,
+  isMobile,
+  onClick,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  collapsed: boolean;
+  isMobile: boolean;
+  onClick?: () => void;
+}) {
+  // Item sans permission requise : toujours visible.
+  // Sinon : on consulte le hook (qui retourne true pour les admins système).
+  const allowed = item.permission ? usePermission(item.permission) : true;
+  if (!allowed) return null;
+
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      title={collapsed ? item.label : undefined}
+      className={cn(
+        "relative flex items-center text-sm transition-colors group",
+        isMobile ? "h-11" : "h-9",
+        collapsed ? "justify-center" : "gap-2.5 px-2.5",
+        isActive
+          ? "bg-accent/15 text-accent"
+          : "text-[var(--sidebar-muted)] hover:text-foreground hover:bg-white/5"
+      )}
+    >
+      <Icon
+        className={cn(
+          "h-4 w-4 shrink-0",
+          isActive
+            ? "text-accent"
+            : "text-[var(--sidebar-muted)] group-hover:text-foreground"
+        )}
+      />
+      {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+    </Link>
+  );
+}
+
+/**
+ * Libellé affiché pour le rôle de l'utilisateur. Mapping français pour les
+ * rôles système ; pour les rôles custom, on capitalise la `roleKey`.
+ */
+function formatRoleLabel(roleKey: string | null): string {
+  if (!roleKey) return "—";
+  if (roleKey === "admin") return "Administrateur";
+  if (roleKey === "member") return "Membre";
+  return roleKey.charAt(0).toUpperCase() + roleKey.slice(1);
 }
 
 export function Sidebar({
@@ -66,9 +138,14 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const isProfilActive = pathname.startsWith("/dashboard/profil");
+  const { roleKey } = usePermissionsContext();
 
   const isMobile = variant === "mobile";
   const effectiveCollapsed = isMobile ? false : collapsed;
+
+  // Le rôle affiché : on prend en priorité la roleKey du context (toujours
+  // à jour avec les rôles custom), sinon on retombe sur profile.role.
+  const displayedRoleKey = roleKey ?? profile?.role ?? null;
 
   return (
     <aside
@@ -118,38 +195,20 @@ export function Sidebar({
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
-          const Icon = item.icon;
           const isActive =
             item.href === "/dashboard"
               ? pathname === "/dashboard"
               : pathname.startsWith(item.href);
 
           return (
-            <Link
+            <NavLink
               key={item.href}
-              href={item.href}
+              item={item}
+              isActive={isActive}
+              collapsed={effectiveCollapsed}
+              isMobile={isMobile}
               onClick={onNavigate}
-              title={effectiveCollapsed ? item.label : undefined}
-              className={cn(
-                "relative flex items-center text-sm transition-colors group",
-                // Variant mobile : items plus hauts pour confort tactile.
-                isMobile ? "h-11" : "h-9",
-                effectiveCollapsed ? "justify-center" : "gap-2.5 px-2.5",
-                isActive
-                  ? "bg-accent/15 text-accent"
-                  : "text-[var(--sidebar-muted)] hover:text-foreground hover:bg-white/5"
-              )}
-            >
-              <Icon
-                className={cn(
-                  "h-4 w-4 shrink-0",
-                  isActive
-                    ? "text-accent"
-                    : "text-[var(--sidebar-muted)] group-hover:text-foreground"
-                )}
-              />
-              {!effectiveCollapsed && <span className="flex-1 truncate">{item.label}</span>}
-            </Link>
+            />
           );
         })}
       </nav>
@@ -192,7 +251,7 @@ export function Sidebar({
                 {profile?.full_name ?? profile?.email ?? "Utilisateur"}
               </p>
               <p className="text-[10px] text-[var(--sidebar-muted)] truncate">
-                {profile?.role === "admin" ? "Administrateur" : "Membre"}
+                {formatRoleLabel(displayedRoleKey)}
               </p>
             </div>
           )}

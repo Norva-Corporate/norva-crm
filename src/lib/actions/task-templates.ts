@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createTask } from "@/lib/actions/tasks";
+import { ensurePermission } from "@/lib/permissions/server";
 import type { TaskPriority, TaskRelatedType } from "@/types";
 
 // ============================================================
@@ -123,6 +124,9 @@ export async function getTaskTemplate(
 export async function createTaskTemplate(
   input: TaskTemplateInput
 ): Promise<ActionResult<{ id: string }>> {
+  const denied = await ensurePermission("task_templates.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -165,6 +169,9 @@ export async function updateTaskTemplate(
   id: string,
   input: TaskTemplateInput
 ): Promise<ActionResult> {
+  const denied = await ensurePermission("task_templates.update");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
 
   const name = input.name?.trim();
@@ -196,6 +203,9 @@ export async function updateTaskTemplate(
 }
 
 export async function deleteTaskTemplate(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("task_templates.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("task_templates")
@@ -232,6 +242,9 @@ export async function applyTaskTemplate(
   },
   baseDate?: string
 ): Promise<ActionResult<{ created: number; failed: number }>> {
+  const denied = await ensurePermission("task_templates.apply");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
