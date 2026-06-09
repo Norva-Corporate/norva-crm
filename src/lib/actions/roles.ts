@@ -46,7 +46,10 @@ function slugify(input: string): string {
     .slice(0, 40);
 }
 
-function handleError(err: unknown, fallback: string): ActionResult {
+function handleError<T = null>(
+  err: unknown,
+  fallback: string
+): ActionResult<T> {
   if (err instanceof PermissionDeniedError) {
     return { success: false, error: "Action réservée aux administrateurs." };
   }
