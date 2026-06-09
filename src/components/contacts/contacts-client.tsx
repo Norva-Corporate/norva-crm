@@ -119,7 +119,6 @@ export function ContactsClient({ initialContacts, companies }: Props) {
               { header: "Téléphone", get: (c) => c.phone },
               { header: "Fonction", get: (c) => c.role },
               { header: "Entreprise", get: (c) => c.company?.name ?? "" },
-              { header: "Notes", get: (c) => c.notes },
               { header: "Créé le", get: (c) => formatDate(c.created_at) },
             ]}
           />

@@ -229,7 +229,6 @@ export type Database = {
           domain: string | null;
           id: string;
           name: string;
-          notes: string | null;
           phone: string | null;
           sector: string | null;
           size: string | null;
@@ -243,7 +242,6 @@ export type Database = {
           domain?: string | null;
           id?: string;
           name: string;
-          notes?: string | null;
           phone?: string | null;
           sector?: string | null;
           size?: string | null;
@@ -257,7 +255,6 @@ export type Database = {
           domain?: string | null;
           id?: string;
           name?: string;
-          notes?: string | null;
           phone?: string | null;
           sector?: string | null;
           size?: string | null;
@@ -274,7 +271,6 @@ export type Database = {
           first_name: string;
           id: string;
           last_name: string;
-          notes: string | null;
           phone: string | null;
           role: string | null;
           updated_at: string;
@@ -287,7 +283,6 @@ export type Database = {
           first_name: string;
           id?: string;
           last_name: string;
-          notes?: string | null;
           phone?: string | null;
           role?: string | null;
           updated_at?: string;
@@ -300,7 +295,6 @@ export type Database = {
           first_name?: string;
           id?: string;
           last_name?: string;
-          notes?: string | null;
           phone?: string | null;
           role?: string | null;
           updated_at?: string;
@@ -317,7 +311,6 @@ export type Database = {
           drive_folder_url: string | null;
           expected_close_date: string | null;
           id: string;
-          notes: string | null;
           probability: number | null;
           source_lead_id: string | null;
           stage: string;
@@ -336,7 +329,6 @@ export type Database = {
           drive_folder_url?: string | null;
           expected_close_date?: string | null;
           id?: string;
-          notes?: string | null;
           probability?: number | null;
           source_lead_id?: string | null;
           stage?: string;
@@ -355,7 +347,6 @@ export type Database = {
           drive_folder_url?: string | null;
           expected_close_date?: string | null;
           id?: string;
-          notes?: string | null;
           probability?: number | null;
           source_lead_id?: string | null;
           stage?: string;
@@ -537,7 +528,6 @@ export type Database = {
           last_name: string | null;
           linkedin_verified: boolean;
           next_follow_up_at: string | null;
-          notes: string | null;
           pagespeed_score: number | null;
           phone: string | null;
           pipeline_stage: string;

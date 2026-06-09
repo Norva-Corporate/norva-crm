@@ -201,7 +201,7 @@ export function CompanyDetailClient({
           />
         </div>
 
-        {/* Adresse + créée le + notes */}
+        {/* Informations entreprise */}
         <Card className="p-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">
             Informations
@@ -270,20 +270,6 @@ export function CompanyDetailClient({
                 {formatDate(company.created_at)}
               </span>
             </InfoRow>
-          </div>
-          <div className="pt-3 border-t border-[var(--border)]">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
-              Notes
-            </p>
-            <InlineText
-              value={company.notes}
-              onSave={patch("notes")}
-              ariaLabel="Notes"
-              variant="textarea"
-              placeholder="Ajouter des notes…"
-              displayClassName="text-xs whitespace-pre-wrap"
-              rows={5}
-            />
           </div>
         </Card>
 

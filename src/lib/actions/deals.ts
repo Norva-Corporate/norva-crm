@@ -18,7 +18,6 @@ export interface DealInput {
   contact_id?: string | null;
   company_id?: string | null;
   assigned_to?: string | null;
-  notes?: string | null;
 }
 
 export type ActionResult<T = null> =
@@ -97,7 +96,6 @@ export async function createDeal(
     contact_id: data.contact_id,
     company_id: data.company_id,
     assigned_to: data.assigned_to,
-    notes: data.notes,
   });
 
   const { data: inserted, error } = await supabase
@@ -143,7 +141,6 @@ export async function updateDeal(
     contact_id: data.contact_id,
     company_id: data.company_id,
     assigned_to: data.assigned_to,
-    notes: data.notes,
   });
 
   const { data: updated, error } = await supabase

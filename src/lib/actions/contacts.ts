@@ -13,7 +13,6 @@ export interface ContactInput {
   phone?: string | null;
   role?: string | null;
   company_id?: string | null;
-  notes?: string | null;
 }
 
 export interface CompanyInput {
@@ -24,7 +23,6 @@ export interface CompanyInput {
   website?: string | null;
   phone?: string | null;
   address?: string | null;
-  notes?: string | null;
 }
 
 export type ActionResult<T = null> =
@@ -71,7 +69,6 @@ export async function createContact(
     phone: data.phone,
     role: data.role,
     company_id: data.company_id,
-    notes: data.notes,
   });
 
   const { data: inserted, error } = await supabase
@@ -103,7 +100,6 @@ export async function updateContact(
     phone: data.phone,
     role: data.role,
     company_id: data.company_id,
-    notes: data.notes,
   });
 
   const { error } = await supabase
@@ -134,7 +130,6 @@ export type ContactPatch = Partial<{
   phone: string | null;
   role: string | null;
   company_id: string | null;
-  notes: string | null;
 }>;
 
 export async function patchContact(
@@ -217,7 +212,6 @@ export async function createCompany(
     website: data.website,
     phone: data.phone,
     address: data.address,
-    notes: data.notes,
   });
 
   const { data: inserted, error } = await supabase
@@ -250,7 +244,6 @@ export async function updateCompany(
     website: data.website,
     phone: data.phone,
     address: data.address,
-    notes: data.notes,
   });
 
   const { error } = await supabase
@@ -282,7 +275,6 @@ export type CompanyPatch = Partial<{
   website: string | null;
   phone: string | null;
   address: string | null;
-  notes: string | null;
 }>;
 
 export async function patchCompany(
@@ -366,7 +358,6 @@ export interface CompanyWithCount {
   website: string | null;
   phone: string | null;
   address: string | null;
-  notes: string | null;
   // Sources lead (migration 045) — utilisé par CompanyDetailClient.
   siren: string | null;
   place_id: string | null;

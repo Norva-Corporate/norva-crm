@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Search, Trophy, Ban, Trash2, Sparkles, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   createDeal,
   updateDeal,
@@ -79,7 +78,6 @@ interface FormState {
   contact_id: string;
   company_id: string;
   assigned_to: string;
-  notes: string;
 }
 
 const empty: FormState = {
@@ -91,7 +89,6 @@ const empty: FormState = {
   contact_id: "",
   company_id: "",
   assigned_to: "",
-  notes: "",
 };
 
 export function DealDrawer({
@@ -150,7 +147,6 @@ export function DealDrawer({
         contact_id: deal.contact_id ?? "",
         company_id: deal.company_id ?? "",
         assigned_to: deal.assigned_to ?? "",
-        notes: deal.notes ?? "",
       });
     } else {
       setForm({ ...empty, stage: defaultStage ?? "discussion" });
@@ -200,7 +196,6 @@ export function DealDrawer({
       contact_id: form.contact_id || null,
       company_id: form.company_id || null,
       assigned_to: form.assigned_to || null,
-      notes: form.notes || null,
     };
 
     startTransition(async () => {
@@ -533,38 +528,6 @@ export function DealDrawer({
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Activité (notes libres) */}
-              {isEdit && (
-                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-                  <div className="flex items-center justify-between">
-                    <Label>Activité</Label>
-                    {deal?.updated_at && (
-                      <span className="text-[10px] text-muted-foreground">
-                        Maj : {formatDate(deal.updated_at)}
-                      </span>
-                    )}
-                  </div>
-                  <Textarea
-                    value={form.notes}
-                    onChange={(e) => update("notes", e.target.value)}
-                    rows={4}
-                    placeholder="Appel, email, prochaine étape…"
-                  />
-                </div>
-              )}
-
-              {!isEdit && (
-                <div className="space-y-1.5">
-                  <Label>Notes</Label>
-                  <Textarea
-                    value={form.notes}
-                    onChange={(e) => update("notes", e.target.value)}
-                    rows={3}
-                    placeholder="Notes internes…"
-                  />
-                </div>
-              )}
 
               {error && (
                 <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 px-2.5 py-1.5">

@@ -55,7 +55,6 @@ export interface LeadImport {
   imported_at: string;
   processed_at: string | null;
   processed_by: string | null;
-  notes: string | null;
   // Qualification (016)
   assigned_to: string | null;
   temperature: LeadTemperature | null;
@@ -415,7 +414,6 @@ export interface LeadUpdatePatch {
   role?: string | null;
   company_name?: string | null;
   company_domain?: string | null;
-  notes?: string | null;
   assigned_to?: string | null;
   temperature?: LeadTemperature | null;
   qualification_score?: number | null;
@@ -432,7 +430,6 @@ const ALLOWED_UPDATE_KEYS: (keyof LeadUpdatePatch)[] = [
   "role",
   "company_name",
   "company_domain",
-  "notes",
   "assigned_to",
   "temperature",
   "qualification_score",

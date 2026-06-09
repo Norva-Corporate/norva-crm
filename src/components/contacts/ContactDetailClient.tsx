@@ -278,21 +278,6 @@ export function ContactDetailClient({
                 </span>
               </InfoRow>
             </dl>
-
-            <div className="pt-3 border-t border-[var(--border)]">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
-                Notes
-              </p>
-              <InlineText
-                value={contact.notes}
-                onSave={patch("notes")}
-                ariaLabel="Notes"
-                variant="textarea"
-                placeholder="Ajouter des notes…"
-                displayClassName="text-xs whitespace-pre-wrap"
-                rows={5}
-              />
-            </div>
           </Card>
 
           {/* Deals */}

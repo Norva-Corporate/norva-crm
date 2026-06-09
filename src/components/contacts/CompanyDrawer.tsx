@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -47,7 +46,6 @@ interface FormState {
   website: string;
   phone: string;
   address: string;
-  notes: string;
 }
 
 const empty: FormState = {
@@ -58,7 +56,6 @@ const empty: FormState = {
   website: "",
   phone: "",
   address: "",
-  notes: "",
 };
 
 export function CompanyDrawer({
@@ -85,7 +82,6 @@ export function CompanyDrawer({
           website: company.website ?? "",
           phone: company.phone ?? "",
           address: company.address ?? "",
-          notes: company.notes ?? "",
         });
       } else {
         setForm(empty);
@@ -110,7 +106,6 @@ export function CompanyDrawer({
       website: form.website || null,
       phone: form.phone || null,
       address: form.address || null,
-      notes: form.notes || null,
     };
 
     startTransition(async () => {
@@ -229,16 +224,6 @@ export function CompanyDrawer({
                   value={form.address}
                   onChange={field("address")}
                   placeholder="1 rue Example, 75001 Paris"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea
-                  value={form.notes}
-                  onChange={field("notes")}
-                  placeholder="Notes internes…"
-                  rows={3}
                 />
               </div>
 

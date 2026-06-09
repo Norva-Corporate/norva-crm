@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -49,7 +48,6 @@ interface FormState {
   phone: string;
   role: string;
   company_id: string;
-  notes: string;
 }
 
 const empty: FormState = {
@@ -59,7 +57,6 @@ const empty: FormState = {
   phone: "",
   role: "",
   company_id: "",
-  notes: "",
 };
 
 export function ContactDrawer({
@@ -87,7 +84,6 @@ export function ContactDrawer({
           phone: contact.phone ?? "",
           role: contact.role ?? "",
           company_id: contact.company_id ?? "",
-          notes: contact.notes ?? "",
         });
       } else {
         setForm({ ...empty, company_id: defaultCompanyId ?? "" });
@@ -111,7 +107,6 @@ export function ContactDrawer({
       phone: form.phone || null,
       role: form.role || null,
       company_id: form.company_id || null,
-      notes: form.notes || null,
     };
 
     startTransition(async () => {
@@ -223,16 +218,6 @@ export function ContactDrawer({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Notes</Label>
-                <Textarea
-                  value={form.notes}
-                  onChange={field("notes")}
-                  placeholder="Notes internes…"
-                  rows={3}
-                />
               </div>
 
               {error && (

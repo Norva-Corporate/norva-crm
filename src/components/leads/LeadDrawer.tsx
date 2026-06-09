@@ -316,7 +316,7 @@ export function LeadDrawer({
           <DrawerDescription>
             {convertMode
               ? "Choisis l'entreprise à associer au contact créé."
-              : "Édite les infos, ajoute des notes, qualifie puis convertis quand tu es prêt."}
+              : "Édite les infos, qualifie puis convertis quand tu es prêt. L'historique des échanges est en bas."}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -538,17 +538,6 @@ export function LeadDrawer({
                   ariaLabel="Date closing prévue"
                 />
               </FieldRow>
-            </Section>
-
-            <Section title="Notes">
-              <InlineText
-                value={lead.notes}
-                onSave={saveText("notes")}
-                ariaLabel="Notes"
-                variant="textarea"
-                placeholder="Contexte du lead, points soulevés au premier contact…"
-                rows={3}
-              />
             </Section>
 
             <Section title="Tags">

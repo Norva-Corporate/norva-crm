@@ -19,7 +19,6 @@ export interface Company {
   website: string | null;
   phone: string | null;
   address: string | null;
-  notes: string | null;
   // Sources lead (migration 045) — auto-remplies à la conversion d'un lead
   // depuis lead_imports.raw_payload. Voir src/lib/external-links.ts.
   siren: string | null;
@@ -39,7 +38,6 @@ export interface Contact {
   role: string | null;
   company_id: string | null;
   company?: Company;
-  notes: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -65,7 +63,6 @@ export interface Deal {
   company?: Company;
   assigned_to: string | null;
   assignee?: Profile;
-  notes: string | null;
   /** Lead d'origine si le deal a été créé via convertLeadToDeal (022) */
   source_lead_id: string | null;
   /** ID Drive du dossier auto-créé pour ce deal (039) */
@@ -174,7 +171,6 @@ export interface DealWithRelations {
   company: Company | null;
   assigned_to: string | null;
   assignee: Profile | null;
-  notes: string | null;
   source_lead_id: string | null;
   source_lead: DealSourceLead | null;
   drive_folder_id: string | null;
@@ -193,7 +189,6 @@ export interface ContactWithRelations {
   role: string | null;
   company_id: string | null;
   company: Company | null;
-  notes: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
