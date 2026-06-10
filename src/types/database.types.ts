@@ -522,6 +522,7 @@ export type Database = {
           estimated_budget: number | null;
           expected_close_date: string | null;
           external_id: string | null;
+          external_links: Json;
           first_name: string | null;
           id: string;
           imported_at: string;

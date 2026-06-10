@@ -58,6 +58,10 @@ export function buildUnifiedColumns(
   const cols: UnifiedColumn[] = [];
 
   for (const stage of LEAD_STAGES) {
+    // 'to_email' (« À mailer ») n'a plus de colonne sur le board : les leads
+    // y sont placés via l'action « Mettre en cold email » (carte/fiche) et
+    // traités par le cron /api/campagnes/generate (cf. page Campagnes).
+    if (stage.key === "to_email") continue;
     if (stage.key !== "to_contact") {
       cols.push({
         kind: "lead",

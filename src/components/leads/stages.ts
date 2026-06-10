@@ -91,6 +91,8 @@ export function buildBoardColumns(
 
   const columns: LeadBoardColumn[] = [];
   for (const stage of LEAD_STAGES) {
+    // 'to_email' (« À mailer ») n'a plus de colonne board (cf. buildUnifiedColumns).
+    if (stage.key === "to_email") continue;
     if (stage.key !== "to_contact") {
       columns.push({
         id: stage.key,

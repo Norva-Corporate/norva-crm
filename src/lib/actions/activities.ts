@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { ActivityEntityType, ActivityType } from "@/types";
+import type { Activity, ActivityEntityType, ActivityType } from "@/types";
 
 export type ActionResult<T = null> =
   | { success: true; data: T }
@@ -19,7 +19,7 @@ const MANUAL_TYPES = new Set(["note", "call", "meeting", "email"]);
 
 export async function createActivity(
   data: ActivityInput
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<Activity>> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -42,7 +42,9 @@ export async function createActivity(
       payload: data.payload ?? null,
       created_by: user.id,
     })
-    .select("id")
+    .select(
+      "id, type, entity_type, entity_id, payload, created_by, created_at, author:profiles!activities_created_by_fkey(id, full_name, avatar_url)"
+    )
     .single();
 
   if (error || !inserted) {
@@ -59,7 +61,14 @@ export async function createActivity(
   };
   revalidatePath(map[data.entity_type]);
 
-  return { success: true, data: { id: inserted.id } };
+  // Normalise author (la jointure fk peut revenir en tableau) pour que la
+  // timeline insère la ligne complète localement, sans re-fetch ni reload.
+  const rawAuthor = (inserted as { author?: unknown }).author;
+  const author = (Array.isArray(rawAuthor) ? rawAuthor[0] : rawAuthor) ?? null;
+  return {
+    success: true,
+    data: { ...(inserted as object), author } as Activity,
+  };
 }
 
 export async function deleteActivity(id: string): Promise<ActionResult> {

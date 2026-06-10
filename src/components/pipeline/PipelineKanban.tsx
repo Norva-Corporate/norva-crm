@@ -149,13 +149,23 @@ export function PipelineKanban({
 
     const q = searchQuery.trim().toLowerCase();
     if (!q) return base;
+    // Normalisation chiffres : permet de matcher un numéro tapé sans
+    // espaces (« 0612 ») contre un téléphone stocké formaté (« 06 12 … »).
+    const digits = q.replace(/\D/g, "");
     return base.filter((l) => {
       const name = `${l.first_name ?? ""} ${l.last_name ?? ""}`
         .toLowerCase()
         .trim();
       const company = (l.company_name ?? "").toLowerCase();
       const email = (l.email ?? "").toLowerCase();
-      return name.includes(q) || company.includes(q) || email.includes(q);
+      const phone = (l.phone ?? "").toLowerCase();
+      return (
+        name.includes(q) ||
+        company.includes(q) ||
+        email.includes(q) ||
+        phone.includes(q) ||
+        (digits.length >= 3 && phone.replace(/\D/g, "").includes(digits))
+      );
     });
   }, [leads, showBrut, searchQuery, ownerProfileId, topQualityOnly]);
 
@@ -209,10 +219,20 @@ export function PipelineKanban({
   const handleLeadChanged = useCallback(
     (
       leadId: string,
-      change: { dismissed?: true; qualified?: true }
+      change: { dismissed?: true; qualified?: true; coldEmailed?: true }
     ) => {
       if (change.dismissed) {
         onLeadsChange((prev) => prev.filter((l) => l.id !== leadId));
+      } else if (change.coldEmailed) {
+        // Passé en 'to_email' : aucune colonne sur le board → le lead
+        // quitte le board (géré ensuite via la page Campagnes).
+        onLeadsChange((prev) =>
+          prev.map((l) =>
+            l.id === leadId
+              ? { ...l, pipeline_stage: "to_email", status: "qualified" }
+              : l
+          )
+        );
       } else if (change.qualified) {
         onLeadsChange((prev) =>
           prev.map((l) =>

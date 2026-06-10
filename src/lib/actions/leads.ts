@@ -37,6 +37,13 @@ export type LeadPipelineStage =
 
 export type LeadEmailVerified = "valid" | "risky" | "invalid" | "unverified";
 
+/** Lien externe personnalisé saisi manuellement sur un lead (cf. migration 050).
+ *  Distinct des liens auto-dérivés de raw_payload (Google Maps, Société.com…). */
+export interface LeadExternalLink {
+  label: string;
+  url: string;
+}
+
 export interface LeadImport {
   id: string;
   source: string;
@@ -53,6 +60,7 @@ export interface LeadImport {
   company_id: string | null;
   duplicate_of: string | null;
   raw_payload: Record<string, unknown> | null;
+  external_links: LeadExternalLink[] | null;
   imported_at: string;
   processed_at: string | null;
   processed_by: string | null;
@@ -430,6 +438,7 @@ export interface LeadUpdatePatch {
   next_follow_up_at?: string | null;
   estimated_budget?: number | null;
   expected_close_date?: string | null;
+  external_links?: LeadExternalLink[] | null;
 }
 
 const ALLOWED_UPDATE_KEYS: (keyof LeadUpdatePatch)[] = [
@@ -446,6 +455,7 @@ const ALLOWED_UPDATE_KEYS: (keyof LeadUpdatePatch)[] = [
   "next_follow_up_at",
   "estimated_budget",
   "expected_close_date",
+  "external_links",
 ];
 
 /**

@@ -61,7 +61,7 @@ interface LeadCardProps {
   /** Callback appelé après dismiss / qualify côté carte — permet au parent de retirer/maj le lead dans son state. */
   onLeadChanged?: (
     leadId: string,
-    change: { dismissed?: true; qualified?: true }
+    change: { dismissed?: true; qualified?: true; coldEmailed?: true }
   ) => void;
   /** Pour le DragOverlay : rend la card sans le hook sortable */
   overlay?: boolean;
@@ -145,6 +145,19 @@ function LeadCardImpl({
       }
       toast.success("Lead qualifié.");
       onLeadChanged?.(lead.id, { qualified: true });
+    });
+  }
+
+  function handleColdEmail(e: React.MouseEvent | Event) {
+    e.stopPropagation();
+    startActionTransition(async () => {
+      const res = await updateLeadStage(lead.id, "to_email");
+      if (!res.success) {
+        toast.error(res.error ?? "Impossible de mettre en file cold email.");
+        return;
+      }
+      toast.success("Mis en file cold email — visible dans Campagnes.");
+      onLeadChanged?.(lead.id, { coldEmailed: true });
     });
   }
 
@@ -348,6 +361,12 @@ function LeadCardImpl({
                         Marquer qualifié
                       </DropdownMenuItem>
                     )}
+                    {lead.email && lead.pipeline_stage !== "to_email" && (
+                      <DropdownMenuItem onSelect={handleColdEmail}>
+                        <Send className="h-3.5 w-3.5" />
+                        Mettre en cold email
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onSelect={handleDismiss}
                       className="text-destructive focus:text-destructive"
@@ -363,9 +382,9 @@ function LeadCardImpl({
 
           {/* Entreprise */}
           {lead.company_name && (
-            <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1 truncate">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 min-w-0">
               <Building2 className="h-3 w-3 shrink-0" />
-              <span className="truncate">{lead.company_name}</span>
+              <span className="truncate min-w-0">{lead.company_name}</span>
               {lead.existing_company_id && (
                 <span
                   title="Entreprise déjà en base"

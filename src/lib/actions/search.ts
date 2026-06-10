@@ -50,11 +50,11 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       supabase
         .from("lead_imports")
         .select(
-          "id, first_name, last_name, company_name, email, pipeline_stage, status"
+          "id, first_name, last_name, company_name, email, phone, pipeline_stage, status"
         )
         .in("status", ["pending", "qualified"])
         .or(
-          `first_name.ilike.${like},last_name.ilike.${like},company_name.ilike.${like},email.ilike.${like}`
+          `first_name.ilike.${like},last_name.ilike.${like},company_name.ilike.${like},email.ilike.${like},phone.ilike.${like}`
         )
         .limit(5),
       supabase

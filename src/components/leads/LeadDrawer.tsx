@@ -39,6 +39,9 @@ import {
   Trophy,
   ArrowRight,
   ExternalLink as ExternalLinkIcon,
+  Send,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -46,14 +49,16 @@ import {
   dismissLead,
   qualifyLead,
   updateLead,
+  updateLeadStage,
   getLeadDetails,
   type LeadAssignee,
+  type LeadExternalLink,
   type LeadUpdatePatch,
   type LeadWithDedup,
 } from "@/lib/actions/leads";
 import type { Activity, Tag } from "@/types";
 import { cn } from "@/lib/utils";
-import { buildExternalLinks } from "@/lib/external-links";
+import { buildExternalLinks, normalizeUrl } from "@/lib/external-links";
 
 const NEW_COMPANY = "__new__";
 const NO_COMPANY = "__none__";
@@ -86,7 +91,7 @@ interface Props {
    *  sans attendre router.refresh() (qui ne ré-hydrate pas useState). */
   onLeadChanged?: (
     leadId: string,
-    change: { dismissed?: true; converted?: true; qualified?: true }
+    change: { dismissed?: true; converted?: true; qualified?: true; coldEmailed?: true }
   ) => void;
 }
 
@@ -288,6 +293,19 @@ export function LeadDrawer({
     });
   }
 
+  function handleColdEmail() {
+    startTransition(async () => {
+      const res = await updateLeadStage(leadId, "to_email");
+      if (!res.success) {
+        toast.error(res.error ?? "Impossible de mettre en file cold email.");
+        return;
+      }
+      toast.success("Mis en file cold email — visible dans Campagnes.");
+      onLeadChanged?.(leadId, { coldEmailed: true });
+      onSuccess?.();
+    });
+  }
+
   const isPending = lead.status === "pending";
   const isQualified = lead.status === "qualified";
   const canConvert = isPending || isQualified;
@@ -475,7 +493,10 @@ export function LeadDrawer({
               )}
             </Section>
 
-            <ExternalLinksSection lead={lead} />
+            <ExternalLinksSection
+              lead={lead}
+              onSaveLinks={(next) => saveAndUpdate({ external_links: next })}
+            />
 
             <Section title="Qualification">
               <FieldRow label="Assigné à">
@@ -606,6 +627,17 @@ export function LeadDrawer({
                 <X className="h-3.5 w-3.5" />
                 Rejeter
               </Button>
+              {lead.email && lead.pipeline_stage !== "to_email" && (
+                <Button
+                  variant="outline"
+                  onClick={handleColdEmail}
+                  disabled={pending}
+                  title="Mettre en file cold email (page Campagnes)"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Cold email
+                </Button>
+              )}
               <Button
                 onClick={() => setConvertMode(true)}
                 disabled={
@@ -710,28 +742,157 @@ function buildLeadExternalLinks(lead: LeadWithDedup) {
   });
 }
 
-function ExternalLinksSection({ lead }: { lead: LeadWithDedup }) {
-  const items = buildLeadExternalLinks(lead);
-  if (items.length === 0) return null;
+type SaveLinksFn = (
+  next: LeadExternalLink[]
+) => Promise<
+  { success: true; data: unknown } | { success: false; error: string }
+>;
+
+function ExternalLinksSection({
+  lead,
+  onSaveLinks,
+}: {
+  lead: LeadWithDedup;
+  onSaveLinks: SaveLinksFn;
+}) {
+  // Liens auto-dérivés de raw_payload (Google Maps, Société.com…) — lecture seule.
+  const auto = buildLeadExternalLinks(lead);
 
   return (
     <Section title="Liens externes">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-        {items.map(({ id, url, label, icon: Icon }) => (
-          <a
-            key={id}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-[var(--muted)]/30 hover:text-accent transition-colors rounded-sm border border-transparent hover:border-[var(--border)]"
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="flex-1 truncate">{label}</span>
-            <ExternalLinkIcon className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-          </a>
-        ))}
-      </div>
+      {auto.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+          {auto.map(({ id, url, label, icon: Icon }) => (
+            <a
+              key={id}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-[var(--muted)]/30 hover:text-accent transition-colors rounded-sm border border-transparent hover:border-[var(--border)]"
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="flex-1 truncate">{label}</span>
+              <ExternalLinkIcon className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+            </a>
+          ))}
+        </div>
+      )}
+      <CustomLinksEditor
+        links={lead.external_links ?? []}
+        onSave={onSaveLinks}
+      />
     </Section>
+  );
+}
+
+// Liens personnalisés éditables (label + URL). Stockés dans
+// lead_imports.external_links (jsonb). Ajout/retrait → saveAndUpdate
+// optimiste côté drawer.
+function CustomLinksEditor({
+  links,
+  onSave,
+}: {
+  links: LeadExternalLink[];
+  onSave: SaveLinksFn;
+}) {
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function persist(next: LeadExternalLink[]) {
+    startTransition(async () => {
+      const res = await onSave(next);
+      if (!res.success) toast.error(res.error);
+    });
+  }
+
+  function handleAdd() {
+    const l = label.trim();
+    const u = url.trim();
+    if (!l || !u) return;
+    setLabel("");
+    setUrl("");
+    persist([...links, { label: l, url: normalizeUrl(u) }]);
+  }
+
+  function handleRemove(index: number) {
+    persist(links.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="space-y-1.5 pt-1">
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        Liens personnalisés
+      </p>
+
+      {links.length > 0 && (
+        <ul className="space-y-1">
+          {links.map((link, i) => (
+            <li
+              key={`${link.url}-${i}`}
+              className="group flex items-center gap-2 px-2 py-1.5 text-xs rounded-sm hover:bg-[var(--muted)]/30"
+            >
+              <ExternalLinkIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-w-0 truncate text-foreground hover:text-accent transition-colors"
+              >
+                {link.label}
+              </a>
+              <button
+                type="button"
+                onClick={() => handleRemove(i)}
+                disabled={pending}
+                aria-label={`Retirer ${link.label}`}
+                className="shrink-0 h-5 w-5 inline-flex items-center justify-center text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity disabled:cursor-not-allowed"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex items-center gap-1.5">
+        <Input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="Nom (ex. Facebook)"
+          aria-label="Nom du lien"
+          className="h-8 text-xs flex-1 min-w-0"
+        />
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder="URL (ex. facebook.com)"
+          aria-label="URL du lien"
+          className="h-8 text-xs flex-1 min-w-0"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleAdd}
+          disabled={pending || !label.trim() || !url.trim()}
+          className="h-8 shrink-0"
+        >
+          {pending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" />
+          )}
+          Ajouter
+        </Button>
+      </div>
+    </div>
   );
 }
 

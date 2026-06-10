@@ -288,11 +288,26 @@ export function PipelineClient({
   const handleLeadDrawerChanged = useCallback(
     (
       leadId: string,
-      change: { dismissed?: true; converted?: true; qualified?: true }
+      change: {
+        dismissed?: true;
+        converted?: true;
+        qualified?: true;
+        coldEmailed?: true;
+      }
     ) => {
       if (change.dismissed || change.converted) {
         // Status terminal → le lead sort du kanban
         setLeads((prev) => prev.filter((l) => l.id !== leadId));
+      } else if (change.coldEmailed) {
+        // Passé en 'to_email' (aucune colonne) → quitte le board, géré
+        // ensuite via la page Campagnes.
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === leadId
+              ? { ...l, pipeline_stage: "to_email", status: "qualified" }
+              : l
+          )
+        );
       } else if (change.qualified) {
         // Maj status local pour cohérence avec la vue liste
         setLeads((prev) =>

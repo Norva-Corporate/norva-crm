@@ -70,6 +70,17 @@ export function buildGoogleMapsUrl(input: {
   return null;
 }
 
+/**
+ * Préfixe `https://` si le schéma est absent. Utilisé pour les liens
+ * saisis manuellement (ex. "facebook.com" → "https://facebook.com") et
+ * pour la branche site web ci-dessous.
+ */
+export function normalizeUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 export function buildSocieteUrl(siren?: string | null): string | null {
   if (!siren) return null;
   return `https://www.societe.com/cgi-bin/search?champs=${siren}`;
@@ -141,9 +152,7 @@ export function buildExternalLinks(
   }
 
   if (input.website) {
-    const normalized = /^https?:\/\//i.test(input.website)
-      ? input.website
-      : `https://${input.website}`;
+    const normalized = normalizeUrl(input.website);
     items.push({
       id: "website",
       url: normalized,

@@ -1,6 +1,5 @@
 "use client";
-import React, { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useTransition } from "react";
 import {
   MessageSquare,
   Phone,
@@ -91,11 +90,21 @@ function ActivityTimelineImpl({
   entityId,
   initialActivities,
 }: Props) {
-  const router = useRouter();
+  const [items, setItems] = useState<ActivityRow[]>(initialActivities);
   const [type, setType] = useState<ManualType>("note");
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // Resync quand on ouvre un autre lead (le parent refetch et passe une
+  // nouvelle prop initialActivities). Sans ça, le state local figerait la
+  // première liste chargée.
+  useEffect(() => {
+    setItems(initialActivities);
+  }, [initialActivities]);
+
+  const handleDeleted = (id: string) =>
+    setItems((prev) => prev.filter((a) => a.id !== id));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -113,7 +122,7 @@ function ActivityTimelineImpl({
         return;
       }
       setBody("");
-      router.refresh();
+      setItems((prev) => [res.data, ...prev]);
     });
   }
 
@@ -174,14 +183,14 @@ function ActivityTimelineImpl({
         </div>
       </form>
 
-      {initialActivities.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-6">
           Aucune activité pour l&apos;instant.
         </p>
       ) : (
         <ol className="space-y-3">
-          {initialActivities.map((a) => (
-            <ActivityItem key={a.id} activity={a} />
+          {items.map((a) => (
+            <ActivityItem key={a.id} activity={a} onDeleted={handleDeleted} />
           ))}
         </ol>
       )}
@@ -193,8 +202,13 @@ function ActivityTimelineImpl({
 // d'activités) quand le drawer parent re-rend pour un autre champ.
 export const ActivityTimeline = React.memo(ActivityTimelineImpl);
 
-function ActivityItem({ activity }: { activity: ActivityRow }) {
-  const router = useRouter();
+function ActivityItem({
+  activity,
+  onDeleted,
+}: {
+  activity: ActivityRow;
+  onDeleted: (id: string) => void;
+}) {
   const { icon: Icon, color, label, body } = renderActivity(activity);
   const author = activity.author?.full_name ?? "Système";
   const [deletePending, startDeleteTransition] = useTransition();
@@ -211,7 +225,7 @@ function ActivityItem({ activity }: { activity: ActivityRow }) {
         return;
       }
       toast.success("Activité supprimée.", { id: `activity-${activity.id}` });
-      router.refresh();
+      onDeleted(activity.id);
     });
   }
 
