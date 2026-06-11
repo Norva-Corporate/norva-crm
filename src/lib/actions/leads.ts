@@ -406,6 +406,9 @@ export async function dismissLead(leadId: string): Promise<ActionResult> {
 }
 
 export async function reopenLead(leadId: string): Promise<ActionResult> {
+  const denied = await ensurePermission("leads.qualify");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("lead_imports")
@@ -466,6 +469,9 @@ export async function updateLead(
   leadId: string,
   patch: LeadUpdatePatch
 ): Promise<ActionResult<LeadImport>> {
+  const denied = await ensurePermission("leads.qualify");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -960,7 +966,6 @@ export async function convertLeadToDeal(
     };
   }
 
-  revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/contacts");
 

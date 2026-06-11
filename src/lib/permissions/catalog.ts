@@ -33,6 +33,8 @@ export const PERMISSION_CATALOG = {
   settings:       ["read", "update"],
   users:          ["read", "invite", "update_role", "delete"],
   roles:          ["read", "manage"],
+  tags:           ["manage"],
+  activities:     ["create", "delete"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type PermissionModule = keyof typeof PERMISSION_CATALOG;
@@ -68,6 +70,8 @@ export const MODULE_LABELS: Record<PermissionModule, string> = {
   settings:       "Paramètres",
   users:          "Utilisateurs",
   roles:          "Rôles & permissions",
+  tags:           "Étiquettes",
+  activities:     "Activités / historique",
 };
 
 export const ACTION_LABELS: Record<string, string> = {

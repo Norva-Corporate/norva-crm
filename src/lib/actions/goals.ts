@@ -211,12 +211,12 @@ export async function deleteGoal(id: string): Promise<ActionResult> {
  * minimiser le payload (on ne ramène pas les rows).
  */
 async function computeMetric(
+  supabase: Awaited<ReturnType<typeof createClient>>,
   metric: GoalMetric,
   ownerId: string | null,
   periodStart: string,
   periodEnd: string
 ): Promise<number> {
-  const supabase = await createClient();
   // periodEnd inclus → upper bound = J+1 pour les comparaisons ts.
   const endExclusive = new Date(periodEnd);
   endExclusive.setDate(endExclusive.getDate() + 1);
@@ -293,6 +293,7 @@ export async function getGoalsWithProgress(): Promise<GoalWithProgress[]> {
   const enriched = await Promise.all(
     (goals as Goal[]).map(async (g) => {
       const current_value = await computeMetric(
+        supabase,
         g.metric_type,
         g.owner_profile_id,
         g.period_start,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { ensurePermission } from "@/lib/permissions/server";
 import {
   generateBriefPdf,
   briefPdfFilename,
@@ -27,6 +28,10 @@ export async function GET(
   } = await supabaseAuth.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+  const denied = await ensurePermission("briefs.read");
+  if (denied) {
+    return NextResponse.json({ error: denied }, { status: 403 });
   }
 
   const url = new URL(req.url);

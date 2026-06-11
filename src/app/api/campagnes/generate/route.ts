@@ -4,11 +4,34 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+/**
+ * Anti-SSRF : la `google_maps_url` provient du raw_payload du lead (entrée
+ * externe via le webhook). On n'autorise que les domaines Google en https,
+ * jamais une IP littérale ni un hôte arbitraire (qui pourrait viser
+ * 169.254.169.254, localhost, un service interne…).
+ */
+function isAllowedMapsUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:") return false;
+  const host = u.hostname.toLowerCase();
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) return false;
+  const isGoogle = /^([a-z0-9-]+\.)*google\.[a-z.]{2,}$/.test(host);
+  const isGooGl = host === "goo.gl" || host.endsWith(".goo.gl");
+  return isGoogle || isGooGl;
+}
+
 async function fetchGoogleMapsInfo(url: string): Promise<string> {
+  if (!isAllowedMapsUrl(url)) return "";
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: AbortSignal.timeout(8000),
+      redirect: "manual",
     });
     const html = await res.text();
 

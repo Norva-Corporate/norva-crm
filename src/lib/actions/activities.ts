@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 import type { Activity, ActivityEntityType, ActivityType } from "@/types";
 
 export type ActionResult<T = null> =
@@ -20,6 +21,9 @@ const MANUAL_TYPES = new Set(["note", "call", "meeting", "email"]);
 export async function createActivity(
   data: ActivityInput
 ): Promise<ActionResult<Activity>> {
+  const denied = await ensurePermission("activities.create");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -72,6 +76,9 @@ export async function createActivity(
 }
 
 export async function deleteActivity(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("activities.delete");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },

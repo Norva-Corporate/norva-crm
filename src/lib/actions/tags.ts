@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePermission } from "@/lib/permissions/server";
 import type { Tag, TagEntityType } from "@/types";
 
 export type ActionResult<T = null> =
@@ -91,6 +92,9 @@ export async function createTag(input: {
   name: string;
   color?: string;
 }): Promise<ActionResult<Tag>> {
+  const denied = await ensurePermission("tags.manage");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -122,6 +126,9 @@ export async function createTag(input: {
 }
 
 export async function deleteTag(id: string): Promise<ActionResult> {
+  const denied = await ensurePermission("tags.manage");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase.from("tags").delete().eq("id", id);
   if (error) return { success: false, error: error.message };
@@ -137,6 +144,9 @@ export async function attachTag(
   if (!VALID_ENTITY.includes(entityType)) {
     return { success: false, error: "Type d'entité invalide." };
   }
+  const denied = await ensurePermission("tags.manage");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("entity_tags")
@@ -157,6 +167,9 @@ export async function detachTag(
   if (!VALID_ENTITY.includes(entityType)) {
     return { success: false, error: "Type d'entité invalide." };
   }
+  const denied = await ensurePermission("tags.manage");
+  if (denied) return { success: false, error: denied };
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("entity_tags")

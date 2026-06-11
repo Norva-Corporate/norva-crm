@@ -441,6 +441,9 @@ export function PipelineKanban({
         itemsByColumn={itemsByColumn}
         onOpenLead={onOpenLead}
         onOpenDeal={onOpenDeal}
+        onLeadsChange={onLeadsChange}
+        onDealsChange={onDealsChange}
+        onLeadChanged={handleLeadChanged}
       />
     );
   }
@@ -621,6 +624,14 @@ interface MobilePipelineViewProps {
   itemsByColumn: Record<string, ActiveItem[]>;
   onOpenLead: (lead: LeadWithDedup) => void;
   onOpenDeal: (deal: DealWithRelations) => void;
+  onLeadsChange: (updater: (prev: LeadWithDedup[]) => LeadWithDedup[]) => void;
+  onDealsChange: (
+    updater: (prev: DealWithRelations[]) => DealWithRelations[]
+  ) => void;
+  onLeadChanged: (
+    leadId: string,
+    change: { dismissed?: true; qualified?: true; coldEmailed?: true }
+  ) => void;
 }
 
 const SWIPE_THRESHOLD = 50; // px de déplacement minimal pour valider un swipe
@@ -630,6 +641,9 @@ function MobilePipelineView({
   itemsByColumn,
   onOpenLead,
   onOpenDeal,
+  onLeadsChange,
+  onDealsChange,
+  onLeadChanged,
 }: MobilePipelineViewProps) {
   const [activeIdx, setActiveIdx] = useState(0);
   const chipsRef = useRef<HTMLDivElement>(null);
@@ -785,6 +799,23 @@ function MobilePipelineView({
                 key={it.lead.id}
                 lead={it.lead}
                 onOpen={onOpenLead}
+                onLeadChanged={onLeadChanged}
+                onStageChanged={(s) =>
+                  onLeadsChange((prev) =>
+                    prev.map((l) =>
+                      l.id === it.lead.id
+                        ? {
+                            ...l,
+                            pipeline_stage: s,
+                            status:
+                              s === "brut" || s === "verified"
+                                ? "pending"
+                                : "qualified",
+                          }
+                        : l
+                    )
+                  )
+                }
                 mobile
               />
             ) : (
@@ -792,6 +823,13 @@ function MobilePipelineView({
                 key={it.deal.id}
                 deal={it.deal}
                 onOpen={onOpenDeal}
+                onStageChanged={(s) =>
+                  onDealsChange((prev) =>
+                    prev.map((d) =>
+                      d.id === it.deal.id ? { ...d, stage: s } : d
+                    )
+                  )
+                }
                 mobile
               />
             )
