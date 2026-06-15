@@ -254,7 +254,7 @@ export function DealDrawer({
     <ResponsiveDrawer
       open={open}
       onOpenChange={(o) => !isLocked && onOpenChange(o)}
-      className="sm:w-[520px]"
+      className="sm:w-[600px] lg:w-[720px]"
     >
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>

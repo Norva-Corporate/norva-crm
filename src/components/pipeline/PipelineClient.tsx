@@ -6,8 +6,18 @@ import React, {
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, LayoutGrid, List, Search, Star } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  LayoutGrid,
+  List,
+  MessageSquareWarning,
+  Search,
+  Star,
+} from "lucide-react";
+import { PermissionGate } from "@/components/permissions/permission-gate";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { TO_CONTACT_OWNERS } from "@/lib/team";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
@@ -493,6 +503,18 @@ export function PipelineClient({
               <span className="font-mono tabular-nums">({brutCount})</span>
             </button>
           )}
+
+          {/* Accès dashboard objections — toujours visible (gating perm). */}
+          <PermissionGate require="objections.read">
+            <Link
+              href="/dashboard/objections"
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs border border-[var(--border)] text-muted-foreground hover:text-foreground hover:border-[var(--muted)] transition-colors"
+              title="Dashboard des objections"
+            >
+              <MessageSquareWarning className="h-3.5 w-3.5" />
+              Objections
+            </Link>
+          </PermissionGate>
 
           {/* Switcher Kanban / Liste — masqué sur mobile : la vue mobile du
               kanban est déjà une liste navigable par colonne, la ListView

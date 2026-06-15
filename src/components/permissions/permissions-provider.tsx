@@ -7,6 +7,7 @@ interface PermissionsContextValue {
   permissions: Set<PermissionKey>;
   isSystemAdmin: boolean;
   roleKey: string | null;
+  userId: string | null;
 }
 
 const PermissionsContext = createContext<PermissionsContextValue | null>(null);
@@ -16,6 +17,7 @@ export interface PermissionsProviderProps {
   permissions: PermissionKey[];
   isSystemAdmin: boolean;
   roleKey: string | null;
+  userId: string | null;
 }
 
 export function PermissionsProvider({
@@ -23,14 +25,16 @@ export function PermissionsProvider({
   permissions,
   isSystemAdmin,
   roleKey,
+  userId,
 }: PermissionsProviderProps) {
   const value = useMemo<PermissionsContextValue>(
     () => ({
       permissions: new Set(permissions),
       isSystemAdmin,
       roleKey,
+      userId,
     }),
-    [permissions, isSystemAdmin, roleKey]
+    [permissions, isSystemAdmin, roleKey, userId]
   );
 
   return (
@@ -45,7 +49,7 @@ export function usePermissionsContext(): PermissionsContextValue {
   if (!ctx) {
     // Pas de provider dans l'arbre : on retombe sur "aucune permission" plutôt
     // que de throw — évite de casser un rendu de login ou une page publique.
-    return { permissions: new Set(), isSystemAdmin: false, roleKey: null };
+    return { permissions: new Set(), isSystemAdmin: false, roleKey: null, userId: null };
   }
   return ctx;
 }

@@ -31,3 +31,8 @@ export function useHasAllPermissions(perms: PermissionKey[]): boolean {
 export function useIsSystemAdmin(): boolean {
   return usePermissionsContext().isSystemAdmin;
 }
+
+/** L'id de l'utilisateur courant (depuis le contexte permissions). */
+export function useCurrentUserId(): string | null {
+  return usePermissionsContext().userId;
+}

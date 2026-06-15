@@ -127,7 +127,11 @@ export function ContactDrawer({
     form.first_name.trim().length > 0 && form.last_name.trim().length > 0;
 
   return (
-    <ResponsiveDrawer open={open} onOpenChange={(o) => !pending && onOpenChange(o)}>
+    <ResponsiveDrawer
+      open={open}
+      onOpenChange={(o) => !pending && onOpenChange(o)}
+      className="sm:w-[600px] lg:w-[720px]"
+    >
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -141,27 +145,25 @@ export function ContactDrawer({
           </DrawerHeader>
 
           <DrawerBody>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Prénom *</Label>
-                  <Input
-                    value={form.first_name}
-                    onChange={field("first_name")}
-                    placeholder="Jean"
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Nom *</Label>
-                  <Input
-                    value={form.last_name}
-                    onChange={field("last_name")}
-                    placeholder="Dupont"
-                    required
-                  />
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+              <div className="space-y-1.5">
+                <Label>Prénom *</Label>
+                <Input
+                  value={form.first_name}
+                  onChange={field("first_name")}
+                  placeholder="Jean"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nom *</Label>
+                <Input
+                  value={form.last_name}
+                  onChange={field("last_name")}
+                  placeholder="Dupont"
+                  required
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -173,26 +175,23 @@ export function ContactDrawer({
                   placeholder="jean@exemple.com"
                 />
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Téléphone</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={field("phone")}
-                    placeholder="+33 6 00 00 00 00"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Rôle</Label>
-                  <Input
-                    value={form.role}
-                    onChange={field("role")}
-                    placeholder="Directeur commercial"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label>Téléphone</Label>
+                <Input
+                  value={form.phone}
+                  onChange={field("phone")}
+                  placeholder="+33 6 00 00 00 00"
+                />
               </div>
 
+              <div className="space-y-1.5">
+                <Label>Rôle</Label>
+                <Input
+                  value={form.role}
+                  onChange={field("role")}
+                  placeholder="Directeur commercial"
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label>Entreprise</Label>
                 <Select
@@ -221,7 +220,7 @@ export function ContactDrawer({
               </div>
 
               {error && (
-                <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 px-2.5 py-1.5 rounded-sm">
+                <p className="sm:col-span-2 text-xs text-destructive bg-destructive/10 border border-destructive/30 px-2.5 py-1.5 rounded-sm">
                   {error}
                 </p>
               )}

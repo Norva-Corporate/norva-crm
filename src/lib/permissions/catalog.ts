@@ -35,6 +35,7 @@ export const PERMISSION_CATALOG = {
   roles:          ["read", "manage"],
   tags:           ["manage"],
   activities:     ["create", "delete"],
+  objections:     ["read", "create", "delete"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type PermissionModule = keyof typeof PERMISSION_CATALOG;
@@ -72,6 +73,7 @@ export const MODULE_LABELS: Record<PermissionModule, string> = {
   roles:          "Rôles & permissions",
   tags:           "Étiquettes",
   activities:     "Activités / historique",
+  objections:     "Objections",
 };
 
 export const ACTION_LABELS: Record<string, string> = {

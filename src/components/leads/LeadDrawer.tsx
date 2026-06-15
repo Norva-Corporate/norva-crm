@@ -28,6 +28,8 @@ import { InlineText } from "@/components/ui/inline-text";
 import { InlinePicker } from "@/components/ui/inline-picker";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
+import { LeadObjectionsSection } from "@/components/objections/LeadObjectionsSection";
+import { TrameR1Dialog } from "@/components/trame/TrameR1Dialog";
 import Link from "next/link";
 import {
   Loader2,
@@ -42,6 +44,7 @@ import {
   Send,
   Plus,
   Trash2,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -104,6 +107,7 @@ export function LeadDrawer({
   onLeadChanged,
 }: Props) {
   const [convertMode, setConvertMode] = useState(false);
+  const [trameOpen, setTrameOpen] = useState(false);
   const [companyChoice, setCompanyChoice] = useState<string>(NO_COMPANY);
   const [companyName, setCompanyName] = useState("");
   const [companyDomain, setCompanyDomain] = useState("");
@@ -313,9 +317,11 @@ export function LeadDrawer({
   const statusBadge = STATUS_BADGE[lead.status];
 
   return (
+    <>
     <ResponsiveDrawer
       open={!!lead}
       onOpenChange={(o) => !pending && onOpenChange(o)}
+      className="sm:w-[640px] lg:w-[840px] xl:w-[960px]"
     >
         <DrawerHeader>
           <DrawerTitle className="flex items-center gap-2 pr-8">
@@ -418,6 +424,16 @@ export function LeadDrawer({
               </div>
             )}
 
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setTrameOpen(true)}
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              Trame RDV 1
+            </Button>
+
+            <div className="lg:columns-2 lg:gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
             <Section title="Identité">
               <FieldRow label="Prénom *">
                 <InlineText
@@ -572,7 +588,13 @@ export function LeadDrawer({
                 />
               )}
             </Section>
+            </div>
 
+            <LeadObjectionsSection
+              entityType="lead_import"
+              entityId={leadId}
+              rawPayload={lead.raw_payload}
+            />
 
             {activities === null ? (
               <SectionSkeleton />
@@ -660,6 +682,16 @@ export function LeadDrawer({
           )}
         </DrawerFooter>
     </ResponsiveDrawer>
+
+    <TrameR1Dialog
+      open={trameOpen}
+      onOpenChange={setTrameOpen}
+      entityType="lead_import"
+      entityId={leadId}
+      companyName={lead.company_name}
+      rawPayload={lead.raw_payload}
+    />
+    </>
   );
 }
 

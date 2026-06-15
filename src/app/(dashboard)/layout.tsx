@@ -33,6 +33,7 @@ export default async function DashboardLayout({
       }
       isSystemAdmin={current?.isSystemAdmin ?? false}
       roleKey={current?.roleKey ?? null}
+      userId={user.id}
     >
       <DashboardShell profile={profile as Profile | null}>
         {children}
