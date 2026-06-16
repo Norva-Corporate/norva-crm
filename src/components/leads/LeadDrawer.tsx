@@ -29,6 +29,7 @@ import { InlinePicker } from "@/components/ui/inline-picker";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { EntityTags } from "@/components/tags/entity-tags";
 import { LeadObjectionsSection } from "@/components/objections/LeadObjectionsSection";
+import { LeadCallsSection } from "@/components/calls/LeadCallsSection";
 import { TrameR1Dialog } from "@/components/trame/TrameR1Dialog";
 import Link from "next/link";
 import {
@@ -589,6 +590,8 @@ export function LeadDrawer({
               )}
             </Section>
             </div>
+
+            <LeadCallsSection entityType="lead_import" entityId={leadId} />
 
             <LeadObjectionsSection
               entityType="lead_import"

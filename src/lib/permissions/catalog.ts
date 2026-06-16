@@ -36,6 +36,7 @@ export const PERMISSION_CATALOG = {
   tags:           ["manage"],
   activities:     ["create", "delete"],
   objections:     ["read", "create", "delete"],
+  calls:          ["read", "create", "delete"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type PermissionModule = keyof typeof PERMISSION_CATALOG;
@@ -74,6 +75,7 @@ export const MODULE_LABELS: Record<PermissionModule, string> = {
   tags:           "Étiquettes",
   activities:     "Activités / historique",
   objections:     "Objections",
+  calls:          "Prospection (appels)",
 };
 
 export const ACTION_LABELS: Record<string, string> = {

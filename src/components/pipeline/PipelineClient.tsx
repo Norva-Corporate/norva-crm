@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   List,
   MessageSquareWarning,
+  PhoneCall,
   Search,
   Star,
 } from "lucide-react";
@@ -503,6 +504,18 @@ export function PipelineClient({
               <span className="font-mono tabular-nums">({brutCount})</span>
             </button>
           )}
+
+          {/* Accès dashboard prospection (KPI cold call) — gating perm. */}
+          <PermissionGate require="calls.read">
+            <Link
+              href="/dashboard/prospection"
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs border border-[var(--border)] text-muted-foreground hover:text-foreground hover:border-[var(--muted)] transition-colors"
+              title="Dashboard prospection (KPI cold call)"
+            >
+              <PhoneCall className="h-3.5 w-3.5" />
+              Prospection
+            </Link>
+          </PermissionGate>
 
           {/* Accès dashboard objections — toujours visible (gating perm). */}
           <PermissionGate require="objections.read">
