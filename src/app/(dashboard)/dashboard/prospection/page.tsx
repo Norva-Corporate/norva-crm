@@ -7,6 +7,7 @@ import {
   FileSignature,
   Users,
   CalendarRange,
+  CalendarDays,
   Layers,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -14,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/lib/permissions/server";
 import { getCallStats, type CallPeriod } from "@/lib/actions/calls";
-import { TO_CONTACT_OWNERS } from "@/lib/team";
+import { STAT_MEMBERS } from "@/lib/team";
 import {
   ProspectionToolbar,
   type ToolbarRep,
@@ -23,6 +24,7 @@ import {
   ReachabilityBreakdown,
   CallRepBreakdown,
   WeeklyRecapTable,
+  DailyRecapTable,
   ProspectionEmptyState,
 } from "@/components/calls/CallCharts";
 
@@ -50,11 +52,11 @@ export default async function ProspectionPage({
     .from("profiles")
     .select("id, email");
 
-  // Résout les commerciaux canoniques (TO_CONTACT_OWNERS) en profile ids.
+  // Résout les membres affichés dans les stats (STAT_MEMBERS) en profile ids.
   const emailToId = new Map(
     (profiles ?? []).map((p) => [(p.email ?? "").toLowerCase(), p.id as string])
   );
-  const reps: ToolbarRep[] = TO_CONTACT_OWNERS.map((o) => {
+  const reps: ToolbarRep[] = STAT_MEMBERS.map((o) => {
     const id = emailToId.get(o.email.toLowerCase());
     return id ? { id, shortName: o.shortName, accent: o.accent } : null;
   }).filter((r): r is ToolbarRep => r !== null);
@@ -185,6 +187,19 @@ export default async function ProspectionPage({
               </CardHeader>
               <CardContent>
                 <WeeklyRecapTable data={stats.weekly} />
+              </CardContent>
+            </Card>
+
+            {/* Récap journalier */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Récap journalier
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DailyRecapTable data={stats.daily} />
               </CardContent>
             </Card>
           </>

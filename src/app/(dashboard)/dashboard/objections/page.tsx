@@ -15,7 +15,7 @@ import {
   getObjectionStats,
   type ObjectionPeriod,
 } from "@/lib/actions/objections";
-import { TO_CONTACT_OWNERS } from "@/lib/team";
+import { STAT_MEMBERS } from "@/lib/team";
 import {
   ObjectionsToolbar,
   type ToolbarRep,
@@ -53,14 +53,14 @@ export default async function ObjectionsPage({
     .from("profiles")
     .select("id, email");
 
-  // Résout les 3 commerciaux canoniques (TO_CONTACT_OWNERS) en profile ids.
+  // Résout les membres affichés dans les stats (STAT_MEMBERS) en profile ids.
   const emailToId = new Map(
     (profiles ?? []).map((p) => [
       (p.email ?? "").toLowerCase(),
       p.id as string,
     ])
   );
-  const reps: ToolbarRep[] = TO_CONTACT_OWNERS.map((o) => {
+  const reps: ToolbarRep[] = STAT_MEMBERS.map((o) => {
     const id = emailToId.get(o.email.toLowerCase());
     return id
       ? { id, shortName: o.shortName, accent: o.accent }

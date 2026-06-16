@@ -24,3 +24,21 @@ export function findOwnerByEmail(
   const lower = email.toLowerCase();
   return TO_CONTACT_OWNERS.find((o) => o.email.toLowerCase() === lower) ?? null;
 }
+
+// Membres affichés dans les stats (prospection + objections) : les contacteurs du
+// kanban + les comptes "maison" qui passent des appels sans avoir de colonne dédiée
+// dans le kanban "À contacter". À NE PAS utiliser pour l'éclatement du kanban
+// (réservé à TO_CONTACT_OWNERS).
+export const STAT_MEMBERS: ReadonlyArray<ToContactOwner> = [
+  ...TO_CONTACT_OWNERS,
+  // Compte Norva Corporate : passe des appels mais n'a pas de colonne kanban.
+  { email: "norvagroupe@gmail.com", shortName: "Norva", accent: "#F43F5E" },
+];
+
+export function findStatMemberByEmail(
+  email: string | null | undefined
+): ToContactOwner | null {
+  if (!email) return null;
+  const lower = email.toLowerCase();
+  return STAT_MEMBERS.find((o) => o.email.toLowerCase() === lower) ?? null;
+}

@@ -103,35 +103,57 @@ export function CallRepBreakdown({ data }: { data: CallStats["byRep"] }) {
 }
 
 // ============================================================
-// Récap hebdomadaire — tableau (semaine la plus récente en haut)
+// Récap chronologique — tableau partagé (période la plus récente en haut)
 // ============================================================
-export function WeeklyRecapTable({ data }: { data: CallStats["weekly"] }) {
-  if (data.length === 0) {
+interface RecapRow {
+  key: string;
+  label: string;
+  appels: number;
+  repondus: number;
+  sansReponse: number;
+  rdv: number;
+  aRappeler: number;
+  devisAEnvoyer: number;
+  devisEnvoyes: number;
+  signes: number;
+}
+
+const RECAP_COLS: { key: keyof RecapRow; label: string }[] = [
+  { key: "appels", label: "Appels" },
+  { key: "repondus", label: "Répondus" },
+  { key: "sansReponse", label: "Sans rép." },
+  { key: "rdv", label: "RDV" },
+  { key: "aRappeler", label: "À rappeler" },
+  { key: "devisAEnvoyer", label: "Devis à env." },
+  { key: "devisEnvoyes", label: "Devis env." },
+  { key: "signes", label: "Signés" },
+];
+
+function RecapTable({
+  firstColLabel,
+  rows,
+  emptyText,
+}: {
+  firstColLabel: string;
+  rows: RecapRow[];
+  emptyText: string;
+}) {
+  if (rows.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-4 text-center">
-        Aucune semaine d&apos;activité sur la période.
+        {emptyText}
       </p>
     );
   }
-  const cols: { key: keyof CallStats["weekly"][number]; label: string }[] = [
-    { key: "appels", label: "Appels" },
-    { key: "repondus", label: "Répondus" },
-    { key: "sansReponse", label: "Sans rép." },
-    { key: "rdv", label: "RDV" },
-    { key: "aRappeler", label: "À rappeler" },
-    { key: "devisAEnvoyer", label: "Devis à env." },
-    { key: "devisEnvoyes", label: "Devis env." },
-    { key: "signes", label: "Signés" },
-  ];
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b border-[var(--border)]">
             <th className="text-left font-mono uppercase tracking-wide text-[10px] text-muted-foreground py-2 pr-3">
-              Semaine
+              {firstColLabel}
             </th>
-            {cols.map((c) => (
+            {RECAP_COLS.map((c) => (
               <th
                 key={c.key}
                 className="text-right font-mono uppercase tracking-wide text-[10px] text-muted-foreground py-2 px-2 whitespace-nowrap"
@@ -145,25 +167,29 @@ export function WeeklyRecapTable({ data }: { data: CallStats["weekly"] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((w) => (
+          {rows.map((r) => (
             <tr
-              key={w.week}
+              key={r.key}
               className="border-b border-[var(--border)] last:border-0"
             >
               <td className="py-2 pr-3 font-mono text-foreground whitespace-nowrap">
-                {formatWeek(w.week)}
+                {r.label}
               </td>
-              {cols.map((c) => (
+              {RECAP_COLS.map((c) => (
                 <td
                   key={c.key}
                   className="text-right py-2 px-2 font-mono tabular-nums text-foreground"
                 >
-                  {w[c.key]}
+                  {r[c.key]}
                 </td>
               ))}
               <td className="text-right py-2 pl-2 font-mono tabular-nums">
                 <Rate
-                  rate={w.appels > 0 ? Math.round((w.repondus / w.appels) * 100) : null}
+                  rate={
+                    r.appels > 0
+                      ? Math.round((r.repondus / r.appels) * 100)
+                      : null
+                  }
                 />
               </td>
             </tr>
@@ -174,11 +200,41 @@ export function WeeklyRecapTable({ data }: { data: CallStats["weekly"] }) {
   );
 }
 
+export function WeeklyRecapTable({ data }: { data: CallStats["weekly"] }) {
+  return (
+    <RecapTable
+      firstColLabel="Semaine"
+      emptyText="Aucune semaine d'activité sur la période."
+      rows={data.map((w) => ({ ...w, key: w.week, label: formatWeek(w.week) }))}
+    />
+  );
+}
+
+export function DailyRecapTable({ data }: { data: CallStats["daily"] }) {
+  return (
+    <RecapTable
+      firstColLabel="Jour"
+      emptyText="Aucun jour d'activité sur la période."
+      rows={data.map((d) => ({ ...d, key: d.day, label: formatDay(d.day) }))}
+    />
+  );
+}
+
 /** 'YYYY-MM-DD' (lundi) → 'sem. du JJ/MM'. */
 function formatWeek(week: string): string {
   const [y, m, d] = week.split("-");
   if (!y || !m || !d) return week;
   return `sem. du ${d}/${m}`;
+}
+
+const WEEKDAYS_FR = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+/** 'YYYY-MM-DD' → 'lun. JJ/MM'. */
+function formatDay(day: string): string {
+  const [y, m, d] = day.split("-");
+  if (!y || !m || !d) return day;
+  const wd = WEEKDAYS_FR[new Date(`${day}T00:00:00Z`).getUTCDay()] ?? "";
+  return `${wd} ${d}/${m}`;
 }
 
 // ============================================================

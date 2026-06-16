@@ -14,7 +14,7 @@ import {
   type ObjectionOutcome,
   type ObjectionStage,
 } from "@/lib/objections";
-import { findOwnerByEmail } from "@/lib/team";
+import { findStatMemberByEmail } from "@/lib/team";
 
 export type ActionResult<T = null> =
   | { success: true; data: T }
@@ -366,7 +366,7 @@ export async function getObjectionStats(
   const byRep = Array.from(repMap.entries())
     .map(([repId, v]) => {
       const profile = profileById.get(repId);
-      const owner = findOwnerByEmail(profile?.email);
+      const owner = findStatMemberByEmail(profile?.email);
       return {
         repId,
         name: owner?.shortName ?? profile?.full_name ?? profile?.email ?? "—",

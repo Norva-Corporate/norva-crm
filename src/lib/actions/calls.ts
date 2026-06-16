@@ -11,7 +11,7 @@ import {
   type CallReachability,
   type CallResult,
 } from "@/lib/call-outcomes";
-import { findOwnerByEmail } from "@/lib/team";
+import { findStatMemberByEmail } from "@/lib/team";
 
 export type ActionResult<T = null> =
   | { success: true; data: T }
@@ -225,6 +225,18 @@ export interface CallWeeklyStat {
   signes: number;
 }
 
+export interface CallDailyStat {
+  day: string; // 'YYYY-MM-DD' (UTC)
+  appels: number;
+  repondus: number;
+  sansReponse: number;
+  rdv: number;
+  aRappeler: number;
+  devisAEnvoyer: number;
+  devisEnvoyes: number;
+  signes: number;
+}
+
 export interface CallStats {
   filters: CallStatsFilters;
   // Volume
@@ -250,6 +262,7 @@ export interface CallStats {
   signesParAppels: number | null; // signes / appels
   byRep: CallRepStat[];
   weekly: CallWeeklyStat[];
+  daily: CallDailyStat[];
 }
 
 function periodStartISO(period: CallPeriod): string | null {
@@ -276,6 +289,11 @@ function weekStartUTC(input: string): string {
   return monday.toISOString().slice(0, 10);
 }
 
+/** Jour (UTC) d'une date, format 'YYYY-MM-DD'. */
+function dayUTC(input: string): string {
+  return new Date(input).toISOString().slice(0, 10);
+}
+
 function emptyStats(filters: CallStatsFilters): CallStats {
   return {
     filters,
@@ -298,6 +316,7 @@ function emptyStats(filters: CallStatsFilters): CallStats {
     signesParAppels: null,
     byRep: [],
     weekly: [],
+    daily: [],
   };
 }
 
@@ -422,11 +441,11 @@ export async function getCallStats(
   stats.signesParRdv = rate(stats.signes, stats.rdv);
   stats.signesParAppels = rate(stats.signes, stats.appels);
 
-  // ----- Par commercial (résolution nom via TO_CONTACT_OWNERS)
+  // ----- Par commercial (résolution nom via STAT_MEMBERS)
   stats.byRep = Array.from(repMap.entries())
     .map(([repId, v]) => {
       const profile = profileById.get(repId);
-      const owner = findOwnerByEmail(profile?.email);
+      const owner = findStatMemberByEmail(profile?.email);
       return {
         repId,
         name: owner?.shortName ?? profile?.full_name ?? profile?.email ?? "—",
@@ -484,6 +503,56 @@ export async function getCallStats(
 
   stats.weekly = Array.from(weekMap.values()).sort((a, b) =>
     a.week < b.week ? 1 : a.week > b.week ? -1 : 0
+  );
+
+  // ----- Récap journalier (call_logs bruts + conversions deals, groupés par jour)
+  const dayMap = new Map<string, CallDailyStat>();
+  const ensureDay = (day: string) => {
+    let d = dayMap.get(day);
+    if (!d) {
+      d = {
+        day,
+        appels: 0,
+        repondus: 0,
+        sansReponse: 0,
+        rdv: 0,
+        aRappeler: 0,
+        devisAEnvoyer: 0,
+        devisEnvoyes: 0,
+        signes: 0,
+      };
+      dayMap.set(day, d);
+    }
+    return d;
+  };
+
+  for (const c of callRows) {
+    if (!c.called_at) continue;
+    const d = ensureDay(dayUTC(c.called_at as string));
+    d.appels += 1;
+    const reach = c.reachability as string;
+    if (reach === "repondu") d.repondus += 1;
+    else if (
+      reach === "messagerie" ||
+      reach === "pas_de_reponse" ||
+      reach === "numero_invalide"
+    )
+      d.sansReponse += 1;
+    const result = c.result as string | null;
+    if (result === "rdv") d.rdv += 1;
+    else if (result === "rappel") d.aRappeler += 1;
+    else if (result === "devis") d.devisAEnvoyer += 1;
+  }
+
+  for (const d of dealRows) {
+    if (!d.updated_at) continue;
+    const day = ensureDay(dayUTC(d.updated_at as string));
+    if (d.stage === "proposal") day.devisEnvoyes += 1;
+    else if (d.stage === "won") day.signes += 1;
+  }
+
+  stats.daily = Array.from(dayMap.values()).sort((a, b) =>
+    a.day < b.day ? 1 : a.day > b.day ? -1 : 0
   );
 
   return stats;
